@@ -8,8 +8,12 @@ dotenv.load_dotenv()
 token = environ['dev_token']
 # token = environ['main_token']
 # from os.path import getsize
+CHARACTERISTICS = {'strength', 'agility', 'intelligence', 'lucky', 'wisdom', 'stamina'}
 HERO_SPELLS = ['Усиленный удар']
-HERO_SPELLS_COST = {'Усиленный удар': 5}
+HERO_SPELLS_DESCRIPTION = {
+    'Усиленный удар': "Вы используете свои силы, пытаясь как можно сильнее ударить противника\nНаносите 110% вашего урона\nЦена: 15 золота"}
+HERO_SPELLS_GOLD_COST = {'Усиленный удар': 15}
+HERO_SPELLS_MP_COST = {'Усиленный удар': 5}
 HERO_SPELLS_CD = {'Усиленный удар': 3}
 HERO_SPELLS_LIBRARY_COST = {'Усиленный удар': 100}
 
@@ -24,12 +28,12 @@ BASIC_DODGE = 5
 def write_class(chat_id, b):
     classes[chat_id] = b
     with open('saves/{}.txt'.format(chat_id), 'wb') as out:
-        pickle.dump(classes, out)
+        pickle.dump(b, out)
 
 
 def read_class(chat_id):
     with open('saves/{}.txt'.format(chat_id), 'rb') as f:
-        classes = pickle.load(f)
+        classes[chat_id] = pickle.load(f)
     return classes[chat_id]
 
 
@@ -226,10 +230,10 @@ class Spider(Enemy):
         return False
 
 
-class Logic_Hero:
+class Logic:
     def __init__(self, message):
         # характеристики
-        self.free_characters_points = 7
+        self.free_characters_points = 3
 
         self.strength = 1
         self.agility = 1
@@ -304,7 +308,7 @@ class Logic_Hero:
         return keyboard
 
     def calc_xp_for_next_lvl(self):
-        return round((self.hero_lvl * 10) ** 1.1, 1)
+        return round((self.hero_lvl * 10) ** 1.5, 1)
 
     def level_up(self):
         self.hero_lvl += 1
@@ -329,7 +333,7 @@ class Logic_Hero:
     def get_xp(self):
         return self.xp
 
-    def add_spells(self, name):
+    def add_spell(self, name):
         self.spells_list.append(name)
 
     def check_lvl_up(self):
@@ -339,7 +343,6 @@ class Logic_Hero:
 
     def death(self, message, keyboard):
         bot.send_message(message.chat.id, 'Вы умерли', reply_markup=keyboard)
-        print(f'hp {self.hp} maxhp{self.max_hp}')
         self.hp = self.max_hp
         self.mp = self.max_mp
         self.xp -= 0.1 * self.xp
@@ -361,10 +364,6 @@ class Logic_Hero:
         self.load_from_file_map()
         self.get_map()
         self.send_map(keyboard_move)
-
-    def set_teleport_coords(self, x, y):
-        self.teleport_cord_x = x
-        self.teleport_cord_y = y
 
     def check_move(self, message, obj, forward, y, x):
         if obj in ENEMIES_SKINS.values():
@@ -416,60 +415,46 @@ class Logic_Hero:
                 bot.register_next_step_handler(message, self.hero_move)
         elif obj == '👩🏼‍🏫':
             if self.map == 'town':
-                self.load_map_move('library', x=self.teleport_cord_x, y=self.teleport_cord_y)
+                self.load_map_move('library', x=5, y=9)
+                bot.register_next_step_handler(message, self.hero_move)
             elif self.map == 'library':
-                pass
-            bot.register_next_step_handler(message, self.hero_move)
+                bot.send_message(self.id, 'Вы начали разговор с библиотекарем', reply_markup=keyboard_librarian)
+                bot.register_next_step_handler(message, self.hero_move)
         elif obj == '🚪':
             if self.map == 'town':
-                self.load_map_move('level1', x=self.teleport_cord_x, y=self.teleport_cord_y)
+                self.load_map_move('level1', x=1, y=1)
             elif self.map == 'level1':
-                self.load_map_move('town', x=self.teleport_cord_x, y=self.teleport_cord_y)
+                self.load_map_move('town', x=5, y=1)
             elif self.map == 'library':
-                self.load_map_move('town', x=self.teleport_cord_x, y=self.teleport_cord_y)
+                self.load_map_move('town', x=6, y=2)
             bot.register_next_step_handler(message, self.hero_move)
         else:
             self.send_map(keyboard_move)
             bot.register_next_step_handler(message, self.hero_move)
 
     def hero_move(self, message):
-        write_class(message.chat.id, self)
+
         butt = message.text
         if butt == '⬇️':
-            try:
-                obj = self.map_list[self.y + 1][self.x]
-                self.set_teleport_coords(self.x, self.y)
-                self.check_move(message, obj, 1, self.y + 1, self.x)
-            except Exception as e:
-                print('move', e)
+            obj = self.map_list[self.y + 1][self.x]
+            self.check_move(message, obj, 1, self.y + 1, self.x)
         elif butt == '➡️':
-            try:
-                obj = self.map_list[self.y][self.x + 1]
-                self.set_teleport_coords(self.x, self.y)
-                self.check_move(message, obj, 2, self.y, self.x + 1)
-            except Exception as e:
-                print('move', e)
+            obj = self.map_list[self.y][self.x + 1]
+            self.check_move(message, obj, 2, self.y, self.x + 1)
         elif butt == '⬆️':
-            try:
-                obj = self.map_list[self.y - 1][self.x]
-                self.set_teleport_coords(self.x, self.y)
-                self.check_move(message, obj, 3, self.y - 1, self.x)
-            except Exception as e:
-                print('move', e)
+            obj = self.map_list[self.y - 1][self.x]
+            self.check_move(message, obj, 3, self.y - 1, self.x)
         elif butt == '⬅️' or butt == '⬅':
-            try:
-                obj = self.map_list[self.y][self.x - 1]
-                self.set_teleport_coords(self.x, self.y)
-                self.check_move(message, obj, 4, self.y, self.x - 1)
-            except Exception as e:
-                print('move', e)
+            obj = self.map_list[self.y][self.x - 1]
+            self.check_move(message, obj, 4, self.y, self.x - 1)
         elif butt == '📚':
             bot.send_message(self.id,
                              "Прокачка характеристик:",
                              reply_markup=self.characteristic_keyboard())
-            # bot.register_next_step_handler(message, char_butt_calls, self)
+            bot.register_next_step_handler(message, self.hero_move)
         else:
             bot.send_message(self.id, 'Вы, кажется, ошиблись действием', reply_markup=keyboard_move)
+        write_class(message.chat.id, self)
 
     def set_map(self, new_map_name):
         self.map = new_map_name
@@ -503,18 +488,19 @@ class Logic_Hero:
     def get_name(self):
         return self.name
 
-    def create_spells_keyboard(self):
-        self.keyboard_spells = telebot.types.ReplyKeyboardMarkup(True)
-        self.keyboard_spells.add('назад')
+    def get_spells_keyboard(self):
+        keyboard_spells = telebot.types.ReplyKeyboardMarkup(True)
+        keyboard_spells.add('назад')
         for spell in self.spells_list:
-            self.keyboard_spells.add(spell)
+            keyboard_spells.add(spell)
+        return keyboard_spells
 
-    def spells(self, message, enemy):
-        text = message.text
-        if text == 'Назад':
+    def fight_spells(self, message, enemy):
+        text = message.text.lower()
+        if text == 'назад':
             bot.send_message(message.chat.id, 'Хорошо', reply_markup=keyboard_fight)
             bot.register_next_step_handler(message, self.fight, enemy)
-        elif text == 'Усиленный удар':
+        elif text == 'усиленный удар':
             bot.send_message(message.chat.id, f'Вы использовали {text}, вы наносите 110% урона')
             self.attack(message, enemy, self.damage * 1.1)
 
@@ -667,8 +653,35 @@ class Logic_Hero:
                     else:
                         bot.register_next_step_handler(message, self.fight, enemy)
         elif text == 'способности':
-            bot.send_message(message.chat.id, 'Вот ваши способности', reply_markup=self.keyboard_spells)
-            bot.register_next_step_handler(message, self.spells, enemy)
+
+            bot.send_message(message.chat.id, 'Вот ваши способности', reply_markup=self.get_spells_keyboard())
+            bot.register_next_step_handler(message, self.fight_spells, enemy)
+        elif text == '💼':
+            bot.send_message(self.id, 'В разработке', keyboard_fight)
+            bot.register_next_step_handler(message, self.fight, enemy)
+        else:
+            bot.send_message(self.id, 'Из-за своей оплошности вы пропустили ход', keyboard_fight)
+            bot.register_next_step_handler(message, self.fight, enemy)
+        write_class(self.id, classes[self.id])
+
+    """
+    Librarian logic
+    """
+
+    def keyboard_spells_shop(self):
+        keyboard = telebot.types.InlineKeyboardMarkup()
+        librarian_spells_shop_spell = telebot.types.InlineKeyboardButton(text='Назад',
+                                                                         callback_data="librarian_spells_shop_return")
+        keyboard.add(librarian_spells_shop_spell)
+        new_spells = HERO_SPELLS
+        for spell in self.spells_list:
+            if spell in new_spells:
+                new_spells.remove(spell)
+        for spell in new_spells:
+            librarian_spells_shop_spell = telebot.types.InlineKeyboardButton(text=spell,
+                                                                             callback_data=f"librarian_spells_shop_{spell}")
+            keyboard.add(librarian_spells_shop_spell)
+        return keyboard
 
 
 bot = telebot.TeleBot(token)
@@ -689,11 +702,88 @@ keyboard_fight.row("Уклонение", "Способности")
 keyboard_yes_or_no = telebot.types.ReplyKeyboardMarkup(True)
 keyboard_yes_or_no.row('Да', "Нет")
 
-classes = {}
-# with open('level1.txt', 'rb') as inp:
-#     level1 = pickle.load(inp)
+"""
+Librarian begin
+"""
+keyboard_librarian = telebot.types.InlineKeyboardMarkup()
+librarian_talk = telebot.types.InlineKeyboardButton(text="Здравствуйте", callback_data="librarian_talk_hi")
+keyboard_librarian.add(librarian_talk)
 
+librarian_spells_shop = telebot.types.InlineKeyboardButton(text="Магазин способностей",
+                                                           callback_data="librarian_spells_shop")
+keyboard_librarian.add(librarian_spells_shop)
+librarian_talk = telebot.types.InlineKeyboardButton(text="До свидания", callback_data="librarian_talk_bye")
+keyboard_librarian.add(librarian_talk)
+
+keyboard_librarian_spells_shop_yes_or_no = telebot.types.InlineKeyboardMarkup()
+librarian_spells_shop_yes = telebot.types.InlineKeyboardButton(text="Да",
+                                                               callback_data="librarian_spells_shop_yes")
+librarian_spells_shop_no = telebot.types.InlineKeyboardButton(text="Нет",
+                                                              callback_data="librarian_spells_shop_no")
+keyboard_librarian_spells_shop_yes_or_no.add(librarian_spells_shop_yes, librarian_spells_shop_no)
+"""
+Librarian end
+"""
+
+classes = {}
 print('start')
+add_spell = ''
+
+
+@bot.callback_query_handler(func=lambda call: 'librarian_spells_shop_yes' == call.data or 'librarian_spells_shop_no' == call.data)
+def yes_or_no_spells(call):
+    global add_spell
+    if call.data == 'librarian_spells_shop_yes':
+        classes[call.from_user.id].add_spell(add_spell)
+        print(classes[call.from_user.id].spells_list)
+        write_class(call.from_user.id, classes[call.from_user.id])
+        edit_message_in_inline(call, f'Вы приобрели {add_spell}', classes[call.from_user.id].keyboard_spells_shop())
+    else:
+        edit_message_in_inline(call, 'Может быть вы хотите что-то еще?',
+                               classes[call.from_user.id].keyboard_spells_shop())
+
+
+def edit_message_in_inline(call, text, keyboard=None):
+    msg = bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                text=text,
+                                parse_mode='Markdown')
+    if keyboard is not None:
+        msg = bot.edit_message_reply_markup(call.from_user.id, call.message.message_id,
+                                            reply_markup=keyboard)
+
+
+@bot.callback_query_handler(func=lambda call: 'librarian_spells_shop' in call.data)
+def dialog_with_librarian_spells_shop_query_handler(call):
+    global add_spell
+    if call.data == 'librarian_spells_shop':
+        edit_message_in_inline(call, 'Все, что я могу предложить:', classes[call.from_user.id].keyboard_spells_shop())
+    elif call.data[22:] in HERO_SPELLS:
+        classes[call.from_user.id].gold += 1000
+        if classes[call.from_user.id].gold >= HERO_SPELLS_GOLD_COST[call.data[22:]]:
+            edit_message_in_inline(call,
+                                   HERO_SPELLS_DESCRIPTION[
+                                       call.data[22:]] + '\n' + f'Вы хотите приобрести {call.data[22:]}?',
+                                   keyboard_librarian_spells_shop_yes_or_no)
+            add_spell = call.data[22:]
+        else:
+            edit_message_in_inline(call, 'У вас недостаточно средств',
+                                   classes[call.from_user.id].keyboard_spells_shop())
+    elif call.data == 'librarian_spells_shop_return':
+        edit_message_in_inline(call, 'Что-то еще?', keyboard_librarian)
+
+
+@bot.callback_query_handler(func=lambda call: 'librarian' in call.data)
+def dialog_with_librarian_query_handler(call):
+    a = read_class(call.from_user.id)
+    if call.data == 'librarian_spells_shop':
+        bot.send_message(call.from_user.id, 'Все, что я могу предложить:',
+                         classes[call.from_user.id].keyboard_spells_shop())
+    elif call.data == 'librarian_talk_hi':
+        edit_message_in_inline(call, 'Здравствуйте!', keyboard_librarian)
+    elif call.data == 'librarian_talk_bye':
+        edit_message_in_inline(call, 'До свидания!')
+        bot.send_message(call.from_user.id, 'Вы закончили разговор с бибилиотекарем', reply_markup=keyboard_move)
+        classes[call.from_user.id].send_map(keyboard_move)
 
 
 def char_butt_calls(hero):
@@ -712,8 +802,8 @@ def char_butt_calls(hero):
     return target_char_hero, strength, agility, intelligence, lucky, wisdom, stamina, points
 
 
-@bot.callback_query_handler(func=lambda call: True)
-def query_handler(call):
+@bot.callback_query_handler(func=lambda call: call.data in CHARACTERISTICS)
+def characteristic_query_handler(call):
     target_char_hero, strength, agility, intelligence, lucky, wisdom, stamina, points = char_butt_calls(
         read_class(call.from_user.id))
     if points > 0:
@@ -775,7 +865,7 @@ def start_message(message):
 
 
 def begin_reg(message):
-    b = Logic_Hero(message)
+    b = Logic(message)
     b.load_from_file_map()
     b.from_list_to_str_map()
     write_class(message.chat.id, b)
@@ -807,11 +897,6 @@ def yes_or_no(message):
     return False
 
 
-def render_spells(message):
-    if message.text.lower() == 'усиленный удар':
-        pass
-
-
 @bot.message_handler(content_types=['text'])
 def send_text(message):
     # print(message)
@@ -821,8 +906,6 @@ def send_text(message):
         if message.text.lower() == '/':
             bot.send_message(message.chat.id, 'Привет, мой создатель')
             # bot.send_message(message.chat.id, '🌲', reply_markup=keyboard1)
-        elif message.text.lower() == 'spells':
-            bot.register_next_step_handler(message, render_spells)
         elif message.text.lower() == 'играть':
             bot.send_message(message.chat.id, a.get_map(), reply_markup=keyboard_move)
             bot.register_next_step_handler(message, a.hero_move)
