@@ -653,7 +653,6 @@ class Logic:
                     else:
                         bot.register_next_step_handler(message, self.fight, enemy)
         elif text == 'способности':
-
             bot.send_message(message.chat.id, 'Вот ваши способности', reply_markup=self.get_spells_keyboard())
             bot.register_next_step_handler(message, self.fight_spells, enemy)
         elif text == '💼':
