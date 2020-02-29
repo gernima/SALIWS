@@ -271,7 +271,6 @@ class Logic:
         self.spells_list = []
         self.gold = 0
         self.name = ''
-        self.create_spells_keyboard()
 
     def damaging(self, damage):
         if self.block > 0:
