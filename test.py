@@ -45,7 +45,7 @@ def start_message(message):
 @bot.message_handler(content_types=['text'])
 def send_text(message):
     bot.send_message(message.chat.id, 'отправь еще раз')
-    bot.register_next_step_handler(message, test_f)
+    # bot.register_next_step_handler(message, test_f)
 
 
 bot.polling()

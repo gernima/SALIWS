@@ -563,7 +563,8 @@ class Logic:
         return False
 
     def drop_from_enemy(self, message, enemy):
-        for item in
+        for item in ENEMIES_ITEM_DROP[enemy.name]:
+            pass
         bot.send_message(message.chat.id,
                          '',
                          reply_markup=keyboard_move)
