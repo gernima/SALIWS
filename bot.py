@@ -5,14 +5,14 @@ import dotenv
 from os import environ
 
 dotenv.load_dotenv()
-token = environ['dev_token']
-# token = environ['main_token']
+# token = environ['dev_token']
+token = environ['main_token']
 # from os.path import getsize
 CHARACTERISTICS = {'strength', 'agility', 'intelligence', 'lucky', 'wisdom', 'stamina'}
 HERO_SPELLS = ['Усиленный удар']
 HERO_SPELLS_DESCRIPTION = {
     'Усиленный удар': "Вы используете свои силы, пытаясь как можно сильнее ударить противника\nНаносите 110% вашего урона\nЦена: 15 золота"}
-HERO_SPELLS_GOLD_COST = {'Усиленный удар': 15}
+HERO_SPELLS_GOLD_COST = {'Усиленный удар': 100}
 HERO_SPELLS_MP_COST = {'Усиленный удар': 5}
 HERO_SPELLS_CD = {'Усиленный удар': 3}
 HERO_SPELLS_LIBRARY_COST = {'Усиленный удар': 100}
@@ -21,6 +21,9 @@ ENEMIES_SPELLS = {'Паук': {'Защита паутиной': 10, 'Опуты�
 # ENEMIES_SPELLS_COST = {}
 ENEMIES_XP = {'Паук': 5}
 ENEMIES_SKINS = {'Паук': '🕷'}
+ENEMIES_ITEM_DROP = {'Паук': ['Паутина']}
+ENEMIES_GOLD_DROP = {'Паук': 10}
+QUESTS = {}
 QUESTS_XP = {}
 BASIC_DODGE = 5
 
@@ -114,9 +117,12 @@ class Enemy:
     def move_to_hero(self):
         pass
 
-    def mp_regen(self):
+    def fight_mp_regen(self):
         if self.mp < self.max_mp:
-            self.mp += self.mp_regen
+            if self.mp + self.mp_regen < self.max_mp:
+                self.mp += self.mp_regen
+            else:
+                self.mp = self.max_mp
 
     def damaging(self, damage):
         # if self.block < damage:
@@ -185,6 +191,7 @@ class Enemy:
             self.chance_actions(n <= chance_per_int, 0 != 0)
         elif text == 'уклонение':
             self.chance_actions(n <= chance_per_int, n <= another_chance + chance_per_int)
+        self.fight_mp_regen()
 
     def fight_logic(self, message, chance_per_percent, from_n=1, to_n=100):
         n = randint(from_n, to_n)
@@ -295,7 +302,7 @@ class Logic:
                                                             callback_data="stamina")
         free_points_button = telebot.types.InlineKeyboardButton(
             text="Очки характеристик {}".format(self.free_characters_points), callback_data='points')
-        reset_button = telebot.types.InlineKeyboardButton(text="Сброс", callback_data="reset")
+        # reset_button = telebot.types.InlineKeyboardButton(text="Сброс", callback_data="reset")
         keyboard.add(free_points_button)
         keyboard.add(strength_button)
         keyboard.add(agility_button)
@@ -303,7 +310,7 @@ class Logic:
         keyboard.add(intel_button)
         keyboard.add(wisdom_button)
         keyboard.add(stamina_button)
-        keyboard.add(reset_button)
+        # keyboard.add(reset_button)
         return keyboard
 
     def calc_xp_for_next_lvl(self):
@@ -548,11 +555,25 @@ class Logic:
                                  f'До следующего уровня осталось {round(self.hero_need_xp - self.xp, 1)} '
                                  f'ед.опыта',
                                  reply_markup=keyboard_move)
+
             self.map_list[enemy.y][enemy.x] = '🌫'
             self.send_map(keyboard_move)
             write_class(message.chat.id, self)
             return True
         return False
+
+    def drop_from_enemy(self, message, enemy):
+        for item in
+        bot.send_message(message.chat.id,
+                         '',
+                         reply_markup=keyboard_move)
+
+    def fight_mp_regen(self):
+        if self.mp < self.max_mp:
+            if self.mp + self.mp_regen < self.max_mp:
+                self.mp += self.mp_regen
+            else:
+                self.mp = self.max_mp
 
     def attack(self, message, enemy, attack_damage):
         damage = round(attack_damage - enemy.block, 1)
@@ -660,10 +681,12 @@ class Logic:
         else:
             bot.send_message(self.id, 'Из-за своей оплошности вы пропустили ход', keyboard_fight)
             bot.register_next_step_handler(message, self.fight, enemy)
+        self.fight_mp_regen()
         write_class(self.id, classes[self.id])
 
     """
     Librarian logic
+    begin
     """
 
     def keyboard_spells_shop(self):
@@ -680,6 +703,11 @@ class Logic:
                                                                              callback_data=f"librarian_spells_shop_{spell}")
             keyboard.add(librarian_spells_shop_spell)
         return keyboard
+
+    """
+    Librarian logic
+    end
+    """
 
 
 bot = telebot.TeleBot(token)
@@ -728,7 +756,8 @@ print('start')
 add_spell = ''
 
 
-@bot.callback_query_handler(func=lambda call: 'librarian_spells_shop_yes' == call.data or 'librarian_spells_shop_no' == call.data)
+@bot.callback_query_handler(
+    func=lambda call: 'librarian_spells_shop_yes' == call.data or 'librarian_spells_shop_no' == call.data)
 def yes_or_no_spells(call):
     global add_spell
     if call.data == 'librarian_spells_shop_yes':
@@ -756,7 +785,6 @@ def dialog_with_librarian_spells_shop_query_handler(call):
     if call.data == 'librarian_spells_shop':
         edit_message_in_inline(call, 'Все, что я могу предложить:', classes[call.from_user.id].keyboard_spells_shop())
     elif call.data[22:] in HERO_SPELLS:
-        classes[call.from_user.id].gold += 1000
         if classes[call.from_user.id].gold >= HERO_SPELLS_GOLD_COST[call.data[22:]]:
             edit_message_in_inline(call,
                                    HERO_SPELLS_DESCRIPTION[
