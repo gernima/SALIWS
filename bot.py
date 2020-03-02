@@ -5,8 +5,8 @@ import dotenv
 from os import environ
 
 dotenv.load_dotenv()
-token = environ['dev_token']
-# token = environ['main_token']
+# token = environ['dev_token']
+token = environ['main_token']
 CHARACTERISTICS = {'strength', 'agility', 'intelligence', 'lucky', 'wisdom', 'stamina'}
 HERO_SPELLS = ['Усиленный удар']
 HERO_SPELLS_DESCRIPTION = {
