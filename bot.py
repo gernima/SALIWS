@@ -278,6 +278,7 @@ class Logic:
         self.spells_list = []
         self.gold = 0
         self.name = ''
+        self.inventory = []
 
     def damaging(self, damage):
         if self.block > 0:
@@ -374,26 +375,21 @@ class Logic:
     def check_move(self, message, obj, forward, y, x):
         if obj in ENEMIES_SKINS.values():
             bot.send_message(self.id, 'Вы напали на' + self.map_list[self.y + 1][self.x])
-            try:
-                if obj == ENEMIES_SKINS["Паук"]:
-                    enemy = Spider(spells_list=ENEMIES_SPELLS['Паук'], lvl=2, xp=ENEMIES_XP['Паук'],
-                                   target=self, skin=ENEMIES_SKINS['Паук'], strength=2, agility=3, lucky=0,
-                                   intelligence=2, wisdom=1, stamina=2, name='Паук', enhancement_n=0, x=x, y=y)
-                # if self.hero_class != 'Маг':
-                bot.send_message(self.id,
-                                 'У вас {}❤ {}💛'.format(self.hp, self.mp, enemy.hp),
-                                 reply_markup=keyboard_fight)
-                # else:
-                #     bot.send_message(self.id,
-                #                      'У вас {}❤ {}💙'.format(self.hp, self.mp, 'in working'),
-                #                      reply_markup=keyboard_fight)
-                try:
-                    if obj == ENEMIES_SKINS["Паук"]:
-                        bot.register_next_step_handler(message, self.fight, enemy)
-                except Exception as e:
-                    print(e)
-            except Exception as e:
-                print(e)
+            if obj == ENEMIES_SKINS["Паук"]:
+                enemy = Spider(spells_list=ENEMIES_SPELLS['Паук'], lvl=2, xp=ENEMIES_XP['Паук'],
+                               target=self, skin=ENEMIES_SKINS['Паук'], strength=2, agility=3, lucky=0,
+                               intelligence=2, wisdom=1, stamina=2, name='Паук', enhancement_n=0, x=x, y=y)
+            # if self.hero_class != 'Маг':
+            bot.send_message(self.id,
+                             'У вас {}❤ {}💛'.format(self.hp, self.mp, enemy.hp),
+                             reply_markup=keyboard_fight)
+            # else:
+            #     bot.send_message(self.id,
+            #                      'У вас {}❤ {}💙'.format(self.hp, self.mp, 'in working'),
+            #                      reply_markup=keyboard_fight)
+
+            if obj == ENEMIES_SKINS["Паук"]:
+                bot.register_next_step_handler(message, self.fight, enemy)
         elif obj == '🌫':
             if forward == 1:  # ⬇️
                 self.map_list[self.y][self.x] = '🌫'
@@ -439,7 +435,6 @@ class Logic:
             bot.register_next_step_handler(message, self.hero_move)
 
     def hero_move(self, message):
-
         butt = message.text
         if butt == '⬇️':
             obj = self.map_list[self.y + 1][self.x]
@@ -600,20 +595,64 @@ class Logic:
                 else:
                     bot.register_next_step_handler(message, self.fight, enemy)
 
-    def fight(self, message, enemy):
-        text = message.text.lower()
-        if text == 'атака':
-            self.attack(message, enemy, self.damage)
-        elif text == 'блок':
-            # damage = round(self.damage - enemy.block, 1)
-            self.block += self.block_add_int
-            # bot.send_message(message.chat.id, f'Вы защищаетесь',
-            #                  reply_markup=keyboard_fight)
+    def fight_block(self, message, enemy):
+        # damage = round(self.damage - enemy.block, 1)
+        self.block += self.block_add_int
+        # bot.send_message(message.chat.id, f'Вы защищаетесь',
+        #                  reply_markup=keyboard_fight)
+        if self.check_enemy_died_and_killed_logic(message, enemy):
+            bot.register_next_step_handler(message, self.hero_move)
+        else:
+            if self.check_death(keyboard_move, message):
+                bot.register_next_step_handler(message, self.hero_move)
+            enemy.fight_logic(message=message, chance_per_percent=0.5)
+            if enemy.you_skip_step_n != 0:
+                for i in range(enemy.you_skip_step_n):
+                    if self.check_death(keyboard_move, message):
+                        bot.register_next_step_handler(message, self.hero_move)
+                    bot.send_message(message.chat.id, 'Вы пропускаете ход', reply_markup=keyboard_fight)
+                    enemy.fight_logic(message=message, chance_per_percent=0.5)
+                    enemy.block = 0
+                    # if self.check_death(keyboard_move, message):
+                    #     bot.register_next_step_handler(message, self.hero_move)
+                enemy.you_skip_step_n = 0
+            self.block = 0
+            if self.check_death(keyboard_move, message):
+                bot.register_next_step_handler(message, self.hero_move)
+            else:
+                bot.register_next_step_handler(message, self.fight, enemy)
+
+    def fight_dodge(self, message, enemy):
+        dodge_chance = randint(1, 100)
+        if dodge_chance <= self.dodge:
+            bot.send_message(message.chat.id, 'Вы смогли уклониться и сумели контратаковать',
+                             reply_markup=keyboard_fight)
+            damage = round(self.damage - enemy.block, 1)
+            enemy.damaging(self.damage)
+            if enemy.block >= self.damage:
+                bot.send_message(message.chat.id, 'Блок противника поглотил весь урон', reply_markup=keyboard_fight)
+            else:
+                bot.send_message(message.chat.id, f'Вы нанесли {damage}❤, осталось {enemy.hp}❤',
+                                 reply_markup=keyboard_fight)
+                if self.check_enemy_died_and_killed_logic(message, enemy):
+                    bot.register_next_step_handler(message, self.hero_move)
+                else:
+                    if enemy.you_skip_step_n != 0:
+                        for i in range(enemy.you_skip_step_n):
+                            if self.check_death(keyboard_move, message):
+                                bot.register_next_step_handler(message, self.hero_move)
+                            bot.send_message(message.chat.id, 'Вы пропускаете ход', reply_markup=keyboard_fight)
+                            enemy.fight_logic(message=message, chance_per_percent=0.5)
+                    enemy.you_skip_step_n = 0
+                    if self.check_death(keyboard_move, message):
+                        bot.register_next_step_handler(message, self.hero_move)
+                    else:
+                        bot.register_next_step_handler(message, self.fight, enemy)
+        else:
+            bot.send_message(message.chat.id, 'Вы не смогли уклониться', reply_markup=keyboard_fight)
             if self.check_enemy_died_and_killed_logic(message, enemy):
                 bot.register_next_step_handler(message, self.hero_move)
             else:
-                if self.check_death(keyboard_move, message):
-                    bot.register_next_step_handler(message, self.hero_move)
                 enemy.fight_logic(message=message, chance_per_percent=0.5)
                 if enemy.you_skip_step_n != 0:
                     for i in range(enemy.you_skip_step_n):
@@ -621,58 +660,20 @@ class Logic:
                             bot.register_next_step_handler(message, self.hero_move)
                         bot.send_message(message.chat.id, 'Вы пропускаете ход', reply_markup=keyboard_fight)
                         enemy.fight_logic(message=message, chance_per_percent=0.5)
-                        enemy.block = 0
-                        # if self.check_death(keyboard_move, message):
-                        #     bot.register_next_step_handler(message, self.hero_move)
-                    enemy.you_skip_step_n = 0
-                self.block = 0
+
                 if self.check_death(keyboard_move, message):
                     bot.register_next_step_handler(message, self.hero_move)
                 else:
                     bot.register_next_step_handler(message, self.fight, enemy)
-        elif text == 'уклонение':
-            dodge_chance = randint(1, 100)
-            if dodge_chance <= self.dodge:
-                bot.send_message(message.chat.id, 'Вы смогли уклониться и сумели контратаковать',
-                                 reply_markup=keyboard_fight)
-                damage = round(self.damage - enemy.block, 1)
-                enemy.damaging(self.damage)
-                if enemy.block >= self.damage:
-                    bot.send_message(message.chat.id, 'Блок противника поглотил весь урон', reply_markup=keyboard_fight)
-                else:
-                    bot.send_message(message.chat.id, f'Вы нанесли {damage}❤, осталось {enemy.hp}❤',
-                                     reply_markup=keyboard_fight)
-                    if self.check_enemy_died_and_killed_logic(message, enemy):
-                        bot.register_next_step_handler(message, self.hero_move)
-                    else:
-                        if enemy.you_skip_step_n != 0:
-                            for i in range(enemy.you_skip_step_n):
-                                if self.check_death(keyboard_move, message):
-                                    bot.register_next_step_handler(message, self.hero_move)
-                                bot.send_message(message.chat.id, 'Вы пропускаете ход', reply_markup=keyboard_fight)
-                                enemy.fight_logic(message=message, chance_per_percent=0.5)
-                        enemy.you_skip_step_n = 0
-                        if self.check_death(keyboard_move, message):
-                            bot.register_next_step_handler(message, self.hero_move)
-                        else:
-                            bot.register_next_step_handler(message, self.fight, enemy)
-            else:
-                bot.send_message(message.chat.id, 'Вы не смогли уклониться', reply_markup=keyboard_fight)
-                if self.check_enemy_died_and_killed_logic(message, enemy):
-                    bot.register_next_step_handler(message, self.hero_move)
-                else:
-                    enemy.fight_logic(message=message, chance_per_percent=0.5)
-                    if enemy.you_skip_step_n != 0:
-                        for i in range(enemy.you_skip_step_n):
-                            if self.check_death(keyboard_move, message):
-                                bot.register_next_step_handler(message, self.hero_move)
-                            bot.send_message(message.chat.id, 'Вы пропускаете ход', reply_markup=keyboard_fight)
-                            enemy.fight_logic(message=message, chance_per_percent=0.5)
 
-                    if self.check_death(keyboard_move, message):
-                        bot.register_next_step_handler(message, self.hero_move)
-                    else:
-                        bot.register_next_step_handler(message, self.fight, enemy)
+    def fight(self, message, enemy):
+        text = message.text.lower()
+        if text == 'атака':
+            self.attack(message, enemy, self.damage)
+        elif text == 'блок':
+            self.fight_block(message, enemy)
+        elif text == 'уклонение':
+            self.fight_dodge(message, enemy)
         elif text == 'способности':
             bot.send_message(message.chat.id, 'Вот ваши способности', reply_markup=self.get_spells_keyboard())
             bot.register_next_step_handler(message, self.fight_spells, enemy)
@@ -814,9 +815,7 @@ def dialog_with_librarian_query_handler(call):
 
 
 def char_butt_calls(hero):
-    # global strength, agility, intelligence, lucky, wisdom, stamina, points, target_char_hero, char_keyboard
     target_char_hero = hero
-
     strength = target_char_hero.strength
     agility = target_char_hero.agility
     intelligence = target_char_hero.intelligence
@@ -824,8 +823,6 @@ def char_butt_calls(hero):
     wisdom = target_char_hero.wisdom
     stamina = target_char_hero.stamina
     points = target_char_hero.free_characters_points
-    # if message.text.lower() == 'Готово' or message.text.lower() == 'Сохранить':
-    #     bot.register_next_step_handler(message, target_char_hero.hero_move)
     return target_char_hero, strength, agility, intelligence, lucky, wisdom, stamina, points
 
 
