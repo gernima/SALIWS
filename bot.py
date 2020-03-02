@@ -5,9 +5,8 @@ import dotenv
 from os import environ
 
 dotenv.load_dotenv()
-# token = environ['dev_token']
-token = environ['main_token']
-# from os.path import getsize
+token = environ['dev_token']
+# token = environ['main_token']
 CHARACTERISTICS = {'strength', 'agility', 'intelligence', 'lucky', 'wisdom', 'stamina'}
 HERO_SPELLS = ['Усиленный удар']
 HERO_SPELLS_DESCRIPTION = {
@@ -37,7 +36,6 @@ def write_class(chat_id, b):
 def read_class(chat_id):
     with open('saves/{}.txt'.format(chat_id), 'rb') as f:
         classes[chat_id] = pickle.load(f)
-    return classes[chat_id]
 
 
 def get_damage_from_strength(strength):
@@ -455,6 +453,7 @@ class Logic:
             bot.register_next_step_handler(message, self.hero_move)
         else:
             bot.send_message(self.id, 'Вы, кажется, ошиблись действием', reply_markup=keyboard_move)
+        print('self', self.strength)
         write_class(message.chat.id, self)
 
     def set_map(self, new_map_name):
@@ -764,7 +763,6 @@ def yes_or_no_spells(call):
     global add_spell
     if call.data == 'librarian_spells_shop_yes':
         classes[call.from_user.id].add_spell(add_spell)
-        print(classes[call.from_user.id].spells_list)
         write_class(call.from_user.id, classes[call.from_user.id])
         edit_message_in_inline(call, f'Вы приобрели {add_spell}', classes[call.from_user.id].keyboard_spells_shop())
     else:
@@ -802,7 +800,7 @@ def dialog_with_librarian_spells_shop_query_handler(call):
 
 @bot.callback_query_handler(func=lambda call: 'librarian' in call.data)
 def dialog_with_librarian_query_handler(call):
-    a = read_class(call.from_user.id)
+    read_class(call.from_user.id)
     if call.data == 'librarian_spells_shop':
         bot.send_message(call.from_user.id, 'Все, что я могу предложить:',
                          classes[call.from_user.id].keyboard_spells_shop())
@@ -814,22 +812,21 @@ def dialog_with_librarian_query_handler(call):
         classes[call.from_user.id].send_map(keyboard_move)
 
 
-def char_butt_calls(hero):
-    target_char_hero = hero
-    strength = target_char_hero.strength
-    agility = target_char_hero.agility
-    intelligence = target_char_hero.intelligence
-    lucky = target_char_hero.lucky
-    wisdom = target_char_hero.wisdom
-    stamina = target_char_hero.stamina
-    points = target_char_hero.free_characters_points
-    return target_char_hero, strength, agility, intelligence, lucky, wisdom, stamina, points
+def char_butt_calls(user_id):
+    read_class(user_id)
+    strength = classes[user_id].strength
+    agility = classes[user_id].agility
+    intelligence = classes[user_id].intelligence
+    lucky = classes[user_id].lucky
+    wisdom = classes[user_id].wisdom
+    stamina = classes[user_id].stamina
+    points = classes[user_id].free_characters_points
+    return classes[user_id], strength, agility, intelligence, lucky, wisdom, stamina, points
 
 
 @bot.callback_query_handler(func=lambda call: call.data in CHARACTERISTICS)
 def characteristic_query_handler(call):
-    target_char_hero, strength, agility, intelligence, lucky, wisdom, stamina, points = char_butt_calls(
-        read_class(call.from_user.id))
+    classes[call.from_user.id], strength, agility, intelligence, lucky, wisdom, stamina, points = char_butt_calls(call.from_user.id)
     if points > 0:
         if call.data == 'strength':
             bot.answer_callback_query(callback_query_id=call.id, text='+1 очко силы')
@@ -855,23 +852,23 @@ def characteristic_query_handler(call):
             bot.answer_callback_query(callback_query_id=call.id, text='+1 очко выносливости')
             stamina += 1
             points -= 1
-
-        target_char_hero.strength = strength
-        target_char_hero.agility = agility
-        target_char_hero.free_characters_points = points
-        target_char_hero.intelligence = intelligence
-        target_char_hero.lucky = lucky
-        target_char_hero.wisdom = wisdom
-        target_char_hero.stamina = stamina
-        target_char_hero.free_characters_points = points
-        target_char_hero.update_char()
-        write_class(call.from_user.id, target_char_hero)
-
+        classes[call.from_user.id].strength = strength
+        classes[call.from_user.id].agility = agility
+        classes[call.from_user.id].free_characters_points = points
+        classes[call.from_user.id].intelligence = intelligence
+        classes[call.from_user.id].lucky = lucky
+        classes[call.from_user.id].wisdom = wisdom
+        classes[call.from_user.id].stamina = stamina
+        print('str', classes[call.from_user.id].strength)
+        classes[call.from_user.id].update_char()
+        write_class(call.from_user.id, classes[call.from_user.id])
+        read_class(call.from_user.id)
+        print('str', classes[call.from_user.id].strength)
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                               text="Прокачка характеристик:",
                               parse_mode='Markdown')
         bot.edit_message_reply_markup(call.from_user.id, call.message.message_id,
-                                      reply_markup=read_class(call.from_user.id).characteristic_keyboard())
+                                      reply_markup=classes[call.from_user.id].characteristic_keyboard())
     else:
         bot.answer_callback_query(callback_query_id=call.id,
                                   text='У вас нет очков характеристик, чтобы их получить повысьте ваш уровень')
@@ -925,20 +922,19 @@ def yes_or_no(message):
 def send_text(message):
     # print(message)
     try:
-        a = read_class(message.chat.id)
-
+        read_class(message.chat.id)
         if message.text.lower() == '/':
             bot.send_message(message.chat.id, 'Привет, мой создатель')
             # bot.send_message(message.chat.id, '🌲', reply_markup=keyboard1)
         elif message.text.lower() == 'играть':
-            bot.send_message(message.chat.id, a.get_map(), reply_markup=keyboard_move)
-            bot.register_next_step_handler(message, a.hero_move)
+            bot.send_message(message.chat.id, classes[message.chat.id].get_map(), reply_markup=keyboard_move)
+            bot.register_next_step_handler(message, classes[message.chat.id].hero_move)
         elif message.text.lower() == 'регистрация и удаление старого аккаунта':
             begin_reg(message)
         else:
             bot.send_message(message.chat.id, 'Err', reply_markup=keyboard_main)
 
-        write_class(message.chat.id, a)
+        # write_class(message.chat.id, classes[message.chat.id])
     except Exception as e:
         bot.send_message(message.chat.id, 'Возможно ты не зарегистрировался',
                          reply_markup=keyboard_main)
