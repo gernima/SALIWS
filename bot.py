@@ -15,12 +15,13 @@ HERO_SPELLS_GOLD_COST = {'Усиленный удар': 100}
 HERO_SPELLS_MP_COST = {'Усиленный удар': 5}
 HERO_SPELLS_CD = {'Усиленный удар': 3}
 HERO_SPELLS_LIBRARY_COST = {'Усиленный удар': 100}
-
+ITEMS_DESCRIPTION = {'Паутина': 'Обычная паутина, которая может выпасть с паука'}
+ITEMS_USED = {}
 ENEMIES_SPELLS = {'Паук': {'Защита паутиной': 10, 'Опутывание паутиной': 8}}
 # ENEMIES_SPELLS_COST = {}
 ENEMIES_XP = {'Паук': 5}
 ENEMIES_SKINS = {'Паук': '🕷'}
-ENEMIES_ITEM_DROP = {'Паук': ['Паутина']}
+ENEMIES_ITEM_DROP = {'Паук': {'Паутина': 1}}
 ENEMIES_GOLD_DROP = {'Паук': 10}
 QUESTS = {}
 QUESTS_XP = {}
@@ -353,7 +354,6 @@ class Logic:
         self.xp -= 0.1 * self.xp
 
     def check_death(self, keyboard, message):
-        # print(f'self.hp {self.hp}')
         if self.hp <= 0:
             self.death(message, keyboard)
             self.send_map(keyboard_move)
@@ -372,22 +372,16 @@ class Logic:
 
     def check_move(self, message, obj, forward, y, x):
         if obj in ENEMIES_SKINS.values():
-            bot.send_message(self.id, 'Вы напали на' + self.map_list[self.y + 1][self.x])
+            bot.send_message(self.id, 'Вы напали на' + obj)
             if obj == ENEMIES_SKINS["Паук"]:
                 enemy = Spider(spells_list=ENEMIES_SPELLS['Паук'], lvl=2, xp=ENEMIES_XP['Паук'],
                                target=self, skin=ENEMIES_SKINS['Паук'], strength=2, agility=3, lucky=0,
                                intelligence=2, wisdom=1, stamina=2, name='Паук', enhancement_n=0, x=x, y=y)
-            # if self.hero_class != 'Маг':
             bot.send_message(self.id,
                              'У вас {}❤ {}💛'.format(self.hp, self.mp, enemy.hp),
                              reply_markup=keyboard_fight)
-            # else:
-            #     bot.send_message(self.id,
-            #                      'У вас {}❤ {}💙'.format(self.hp, self.mp, 'in working'),
-            #                      reply_markup=keyboard_fight)
 
-            if obj == ENEMIES_SKINS["Паук"]:
-                bot.register_next_step_handler(message, self.fight, enemy)
+            bot.register_next_step_handler(message, self.fight, enemy)
         elif obj == '🌫':
             if forward == 1:  # ⬇️
                 self.map_list[self.y][self.x] = '🌫'
@@ -450,10 +444,15 @@ class Logic:
             bot.send_message(self.id,
                              "Прокачка характеристик:",
                              reply_markup=self.characteristic_keyboard())
+            bot.send_message(self.id, 'Нажмите играть для продолжения', reply_markup=keyboard_main)
+        elif butt == '💼':
+            if len(self.inventory) != 0:
+                bot.send_message(self.id, 'Ваш инвентарь:', reply_markup=self.create_inventory_keyboard())
+            else:
+                bot.send_message(self.id, 'Ваш инвентарь пуст', reply_markup=keyboard_move)
             bot.register_next_step_handler(message, self.hero_move)
         else:
             bot.send_message(self.id, 'Вы, кажется, ошиблись действием', reply_markup=keyboard_move)
-        print('self', self.strength)
         write_class(message.chat.id, self)
 
     def set_map(self, new_map_name):
@@ -549,19 +548,35 @@ class Logic:
                                  f'До следующего уровня осталось {round(self.hero_need_xp - self.xp, 1)} '
                                  f'ед.опыта',
                                  reply_markup=keyboard_move)
-
+            self.drop_from_enemy(message, enemy)
             self.map_list[enemy.y][enemy.x] = '🌫'
             self.send_map(keyboard_move)
             write_class(message.chat.id, self)
             return True
         return False
 
+    def inventory_add_item(self, item):
+        self.inventory.append(item)
+
     def drop_from_enemy(self, message, enemy):
-        for item in ENEMIES_ITEM_DROP[enemy.name]:
-            pass
-        bot.send_message(message.chat.id,
-                         '',
-                         reply_markup=keyboard_move)
+        self.drop_items = []
+        for item in ENEMIES_ITEM_DROP[enemy.name].keys():
+            chance = randint(1, 100)
+            if chance <= ENEMIES_ITEM_DROP[enemy.name][item] * 100:
+                self.drop_items.append(item)
+        if self.drop_items != 0:
+            bot.send_message(message.chat.id, "Выберите, что хотите подобрать")
+            bot.send_message(message.chat.id, f"Вам выпало:", reply_markup=self.keyboard_get_drop())
+        else:
+            bot.send_message(message.chat.id, "Вам ничего не выпало")
+
+    def keyboard_get_drop(self):
+        keyboard = telebot.types.InlineKeyboardMarkup()
+        for i in range(len(self.drop_items)):
+            item_button = telebot.types.InlineKeyboardButton(text=self.drop_items[i],
+                                                             callback_data=f"drop_from_enemy_{i}")
+            keyboard.add(item_button)
+        return keyboard
 
     def fight_mp_regen(self):
         if self.mp < self.max_mp:
@@ -677,13 +692,24 @@ class Logic:
             bot.send_message(message.chat.id, 'Вот ваши способности', reply_markup=self.get_spells_keyboard())
             bot.register_next_step_handler(message, self.fight_spells, enemy)
         elif text == '💼':
-            bot.send_message(self.id, 'В разработке', keyboard_fight)
+            if len(self.inventory) != 0:
+                bot.send_message(self.id, 'Ваш инвентарь:', reply_markup=self.create_inventory_keyboard())
+            else:
+                bot.send_message(self.id, 'Ваш инвентарь пуст', reply_markup=keyboard_move)
             bot.register_next_step_handler(message, self.fight, enemy)
         else:
-            bot.send_message(self.id, 'Из-за своей оплошности вы пропустили ход', keyboard_fight)
+            bot.send_message(self.id, 'Из-за своей оплошности вы пропустили ход', reply_markup=keyboard_fight)
             bot.register_next_step_handler(message, self.fight, enemy)
         self.fight_mp_regen()
         write_class(self.id, classes[self.id])
+
+    def create_inventory_keyboard(self):
+        keyboard = telebot.types.InlineKeyboardMarkup()
+        for i in range(len(self.inventory)):
+            item_button = telebot.types.InlineKeyboardButton(text=self.inventory[i],
+                                                             callback_data=f"inventory_{i}")
+            keyboard.add(item_button)
+        return keyboard
 
     """
     Librarian logic
@@ -752,9 +778,48 @@ keyboard_librarian_spells_shop_yes_or_no.add(librarian_spells_shop_yes, libraria
 Librarian end
 """
 
+"""
+Inventory
+begin
+"""
+keyboard_return_in_inventory = telebot.types.InlineKeyboardMarkup()
+keyboard_return_in_inventory.add(telebot.types.InlineKeyboardButton(text="Вернуться в инвентарь",
+                                                                    callback_data="inventory_return"))
+"""
+Inventory
+end
+"""
+
 classes = {}
 print('start')
 add_spell = ''
+
+
+@bot.callback_query_handler(func=lambda call: 'inventory_' in call.data)
+def drop_from_enemy(call):
+    text = call.data[10:]
+    read_class(call.from_user.id)
+    if text == 'return':
+        edit_message_in_inline(call, 'Ваш инвентарь:',
+                               classes[call.from_user.id].create_inventory_keyboard())
+    else:
+        edit_message_in_inline(call, ITEMS_DESCRIPTION[classes[call.from_user.id].inventory[int(text)]],
+                               keyboard_return_in_inventory)
+
+
+@bot.callback_query_handler(func=lambda call: 'drop_from_enemy_' in call.data)
+def drop_from_enemy(call):
+    read_class(call.from_user.id)
+    text = call.data[16:]
+    item = classes[call.from_user.id].drop_items.pop(int(text))
+    classes[call.from_user.id].inventory_add_item(item)
+    write_class(call.from_user.id, classes[call.from_user.id])
+    read_class(call.from_user.id)
+    if len(classes[call.from_user.id].drop_items) != 0:
+        edit_message_in_inline(call, f'Вы подобрали {item}, что-то еще?',
+                               classes[call.from_user.id].keyboard_get_drop())
+    else:
+        edit_message_in_inline(call, 'Предметов нет')
 
 
 @bot.callback_query_handler(
@@ -826,7 +891,8 @@ def char_butt_calls(user_id):
 
 @bot.callback_query_handler(func=lambda call: call.data in CHARACTERISTICS)
 def characteristic_query_handler(call):
-    classes[call.from_user.id], strength, agility, intelligence, lucky, wisdom, stamina, points = char_butt_calls(call.from_user.id)
+    classes[call.from_user.id], strength, agility, intelligence, lucky, wisdom, stamina, points = char_butt_calls(
+        call.from_user.id)
     if points > 0:
         if call.data == 'strength':
             bot.answer_callback_query(callback_query_id=call.id, text='+1 очко силы')
@@ -859,11 +925,9 @@ def characteristic_query_handler(call):
         classes[call.from_user.id].lucky = lucky
         classes[call.from_user.id].wisdom = wisdom
         classes[call.from_user.id].stamina = stamina
-        print('str', classes[call.from_user.id].strength)
         classes[call.from_user.id].update_char()
         write_class(call.from_user.id, classes[call.from_user.id])
         read_class(call.from_user.id)
-        print('str', classes[call.from_user.id].strength)
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                               text="Прокачка характеристик:",
                               parse_mode='Markdown')
@@ -920,7 +984,6 @@ def yes_or_no(message):
 
 @bot.message_handler(content_types=['text'])
 def send_text(message):
-    # print(message)
     try:
         read_class(message.chat.id)
         if message.text.lower() == '/':
