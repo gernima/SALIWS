@@ -1,0 +1,1 @@
+print(len('inventory_inventory_'))
