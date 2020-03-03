@@ -414,6 +414,10 @@ class Logic:
             elif self.map == 'library':
                 bot.send_message(self.id, 'Вы начали разговор с библиотекарем', reply_markup=keyboard_librarian)
                 bot.register_next_step_handler(message, self.hero_move)
+        elif obj == '🧵':
+            if self.map == 'town':
+                self.load_map_move('sewing', x=5, y=1)
+                bot.register_next_step_handler(message, self.hero_move)
         elif obj == '🚪':
             if self.map == 'town':
                 self.load_map_move('level1', x=1, y=1)
