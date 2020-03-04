@@ -5,9 +5,10 @@ import dotenv
 from os import environ
 
 dotenv.load_dotenv()
-# token = environ['dev_token']
-token = environ['main_token']
+token = environ['dev_token']
+# token = environ['main_token']
 CHARACTERISTICS = {'strength', 'agility', 'intelligence', 'lucky', 'wisdom', 'stamina'}
+
 HERO_SPELLS = ['Усиленный удар']
 HERO_SPELLS_DESCRIPTION = {
     'Усиленный удар': "Вы используете свои силы, пытаясь как можно сильнее ударить противника\nНаносите 110% вашего урона\nЦена: 15 золота"}
@@ -15,16 +16,25 @@ HERO_SPELLS_GOLD_COST = {'Усиленный удар': 100}
 HERO_SPELLS_MP_COST = {'Усиленный удар': 5}
 HERO_SPELLS_CD = {'Усиленный удар': 3}
 HERO_SPELLS_LIBRARY_COST = {'Усиленный удар': 100}
+
+SEWER_SKINS_SHOP = {'🤡': 100, '😒': 100, '😡': 100, '🤓': 100, '😀': 100, '😈': 100, '💩': 100, '👻': 100, '👺': 100,
+                    '👹': 100,
+                    '👿': 100, '💀': 100}
+
 ITEMS_DESCRIPTION = {'Паутина': 'Обычная паутина, которая может выпасть с паука'}
 ITEMS_USED = {}
+
 ENEMIES_SPELLS = {'Паук': {'Защита паутиной': 10, 'Опутывание паутиной': 8}}
 # ENEMIES_SPELLS_COST = {}
 ENEMIES_XP = {'Паук': 5}
 ENEMIES_SKINS = {'Паук': '🕷'}
 ENEMIES_ITEM_DROP = {'Паук': {'Паутина': 1}}
 ENEMIES_GOLD_DROP = {'Паук': 10}
-QUESTS = {}
-QUESTS_XP = {}
+ENEMIES_GOLD_DROP_EDIT = {'Паук': 3}
+
+QUESTS = {"Сбор паутины для швеи": {"Паутина": 5}}
+QUESTS_XP = {"Сбор паутины для швеи": 20}
+
 BASIC_DODGE = 5
 
 
@@ -408,11 +418,16 @@ class Logic:
                 self.send_map(keyboard_move)
                 bot.register_next_step_handler(message, self.hero_move)
         elif obj == '👩🏼‍🏫':
+            if self.map == 'library':
+                bot.send_message(self.id, 'Вы начали разговор с библиотекарем', reply_markup=keyboard_librarian)
+                bot.register_next_step_handler(message, self.hero_move)
+        elif obj == '👰🏼':
+            if self.map == 'sewing':
+                bot.send_message(self.id, 'Вы начали разговор с библиотекарем', reply_markup=keyboard_sewer)
+                bot.register_next_step_handler(message, self.hero_move)
+        elif obj == '📚':
             if self.map == 'town':
                 self.load_map_move('library', x=5, y=9)
-                bot.register_next_step_handler(message, self.hero_move)
-            elif self.map == 'library':
-                bot.send_message(self.id, 'Вы начали разговор с библиотекарем', reply_markup=keyboard_librarian)
                 bot.register_next_step_handler(message, self.hero_move)
         elif obj == '🧵':
             if self.map == 'town':
@@ -425,6 +440,8 @@ class Logic:
                 self.load_map_move('town', x=5, y=1)
             elif self.map == 'library':
                 self.load_map_move('town', x=6, y=2)
+            elif self.map == 'sewing':
+                self.load_map_move('town', x=4, y=2)
             bot.register_next_step_handler(message, self.hero_move)
         else:
             self.send_map(keyboard_move)
@@ -564,6 +581,10 @@ class Logic:
 
     def drop_from_enemy(self, message, enemy):
         self.drop_items = []
+        gold_edit = randint(-1 * ENEMIES_GOLD_DROP_EDIT[enemy.name], ENEMIES_GOLD_DROP_EDIT[enemy.name])
+        gold_drop = ENEMIES_GOLD_DROP[enemy.name] + gold_edit
+        self.gold += gold_drop
+        bot.send_message(self.id, f"Выпало {gold_drop} золота\nВаш баланс: {self.gold}")
         for item in ENEMIES_ITEM_DROP[enemy.name].keys():
             chance = randint(1, 100)
             if chance <= ENEMIES_ITEM_DROP[enemy.name][item] * 100:
@@ -720,7 +741,7 @@ class Logic:
     begin
     """
 
-    def keyboard_spells_shop(self):
+    def keyboard_librarian_spells_shop(self):
         keyboard = telebot.types.InlineKeyboardMarkup()
         librarian_spells_shop_spell = telebot.types.InlineKeyboardButton(text='Назад',
                                                                          callback_data="librarian_spells_shop_return")
@@ -739,6 +760,18 @@ class Logic:
     Librarian logic
     end
     """
+
+    def keyboard_sewer_skins_shop(self):
+        keyboard = telebot.types.InlineKeyboardMarkup(row_width=5)
+        librarian_spells_shop_spell = telebot.types.InlineKeyboardButton(text='Назад',
+                                                                         callback_data="sewer_skins_shop_return")
+        keyboard.add(librarian_spells_shop_spell)
+        for skin, cost in SEWER_SKINS_SHOP.items():
+            if skin != self.hero_skin:
+                librarian_spells_shop_spell = telebot.types.InlineKeyboardButton(text=skin + '|' + str(cost),
+                                                                                 callback_data=f"sewer_skins_shop_{skin}")
+                keyboard.add(librarian_spells_shop_spell)
+        return keyboard
 
 
 bot = telebot.TeleBot(token)
@@ -760,7 +793,7 @@ keyboard_yes_or_no = telebot.types.ReplyKeyboardMarkup(True)
 keyboard_yes_or_no.row('Да', "Нет")
 
 """
-Librarian begin
+Library begin
 """
 keyboard_librarian = telebot.types.InlineKeyboardMarkup()
 librarian_talk = telebot.types.InlineKeyboardButton(text="Здравствуйте", callback_data="librarian_talk_hi")
@@ -779,7 +812,7 @@ librarian_spells_shop_no = telebot.types.InlineKeyboardButton(text="Нет",
                                                               callback_data="librarian_spells_shop_no")
 keyboard_librarian_spells_shop_yes_or_no.add(librarian_spells_shop_yes, librarian_spells_shop_no)
 """
-Librarian end
+Library end
 """
 
 """
@@ -793,10 +826,81 @@ keyboard_return_in_inventory.add(telebot.types.InlineKeyboardButton(text="Вер
 Inventory
 end
 """
+"""
+sewing
+begin
+"""
+keyboard_sewer = telebot.types.InlineKeyboardMarkup()
+sewer_talk = telebot.types.InlineKeyboardButton(text="Здравствуйте", callback_data="sewer_talk_hi")
+keyboard_sewer.add(sewer_talk)
 
+sewer_spells_shop = telebot.types.InlineKeyboardButton(text="Магазин скинов",
+                                                       callback_data="sewer_skins_shop")
+keyboard_sewer.add(sewer_spells_shop)
+sewer_talk = telebot.types.InlineKeyboardButton(text="До свидания", callback_data="sewer_talk_bye")
+keyboard_sewer.add(sewer_talk)
+
+keyboard_sewer_skins_shop_yes_or_no = telebot.types.InlineKeyboardMarkup()
+sewer_skins_shop_yes = telebot.types.InlineKeyboardButton(text="Да",
+                                                          callback_data="sewer_skins_shop_yes")
+sewer_skins_shop_no = telebot.types.InlineKeyboardButton(text="Нет",
+                                                         callback_data="sewer_skins_shop_no")
+keyboard_sewer_skins_shop_yes_or_no.add(sewer_skins_shop_yes, sewer_skins_shop_no)
+"""
+sewing
+end.
+"""
 classes = {}
 print('start')
 add_spell = ''
+add_skin = ''
+
+
+@bot.callback_query_handler(
+    func=lambda call: 'sewer_skins_shop_yes' == call.data or 'sewer_skins_shop_no' == call.data)
+def yes_or_no_skins(call):
+    global add_skin
+    if call.data == 'sewer_skins_shop_yes':
+        classes[call.from_user.id].hero_skin = add_skin
+        write_class(call.from_user.id, classes[call.from_user.id])
+        edit_message_in_inline(call, f'Вы приобрели {add_skin}', classes[call.from_user.id].keyboard_sewer_skins_shop())
+    else:
+        edit_message_in_inline(call, 'Может быть вы хотите что-то еще?',
+                               classes[call.from_user.id].keyboard_sewer_skins_shop())
+
+
+@bot.callback_query_handler(func=lambda call: 'sewer_skins_shop' in call.data)
+def dialog_with_sewer_spells_shop_query_handler(call):
+    global add_skin
+    z = len('sewer_skins_shop') + 1
+    if call.data == 'sewer_skins_shop':
+        edit_message_in_inline(call, 'Все, что я могу предложить:',
+                               classes[call.from_user.id].keyboard_sewer_skins_shop())
+    elif call.data[z:] in SEWER_SKINS_SHOP.keys():
+        if classes[call.from_user.id].gold >= SEWER_SKINS_SHOP[call.data[z:]]:
+            add_skin = call.data[z:]
+            edit_message_in_inline(call, f'Вы хотите приобрести {call.data[z:]}?',
+                                   keyboard_sewer_skins_shop_yes_or_no)
+        else:
+            edit_message_in_inline(call, 'У вас недостаточно средств',
+                                   classes[call.from_user.id].keyboard_sewer_skins_shop())
+    elif call.data == 'sewer_skins_shop_return':
+        edit_message_in_inline(call, 'Что-то еще?', keyboard_sewer)
+
+
+@bot.callback_query_handler(func=lambda call: 'sewer' in call.data)
+def dialog_with_sewer_query_handler(call):
+    global add_skin
+    read_class(call.from_user.id)
+    if call.data == 'sewer_spells_shop':
+        edit_message_in_inline(call.from_user.id, 'Все, что я могу предложить:',
+                               classes[call.from_user.id].keyboard_sewer_skins_shop())
+    elif call.data == 'sewer_talk_hi':
+        edit_message_in_inline(call, 'Приветики!', keyboard_sewer)
+    elif call.data == 'sewer_talk_bye':
+        edit_message_in_inline(call, 'Пока!')
+        bot.send_message(call.from_user.id, 'Вы закончили разговор со швеей', reply_markup=keyboard_move)
+        classes[call.from_user.id].send_map(keyboard_move)
 
 
 @bot.callback_query_handler(func=lambda call: 'inventory_' in call.data)
