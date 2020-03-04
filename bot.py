@@ -362,6 +362,7 @@ class Logic:
         self.hp = self.max_hp
         self.mp = self.max_mp
         self.xp -= 0.1 * self.xp
+        self.load_map_move('town', x=5, y=1)
 
     def check_death(self, keyboard, message):
         if self.hp <= 0:
@@ -766,11 +767,18 @@ class Logic:
         librarian_spells_shop_spell = telebot.types.InlineKeyboardButton(text='Назад',
                                                                          callback_data="sewer_skins_shop_return")
         keyboard.add(librarian_spells_shop_spell)
+        a = []
+        n = 0
         for skin, cost in SEWER_SKINS_SHOP.items():
             if skin != self.hero_skin:
+                n += 1
                 librarian_spells_shop_spell = telebot.types.InlineKeyboardButton(text=skin + '|' + str(cost),
                                                                                  callback_data=f"sewer_skins_shop_{skin}")
-                keyboard.add(librarian_spells_shop_spell)
+                a.append(librarian_spells_shop_spell)
+            if n == 5:
+                keyboard.add(a[0], a[1], a[2], a[3], a[4])
+                a = []
+                n = 0
         return keyboard
 
 
