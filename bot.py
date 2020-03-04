@@ -5,8 +5,8 @@ import dotenv
 from os import environ
 
 dotenv.load_dotenv()
-token = environ['dev_token']
-# token = environ['main_token']
+# token = environ['dev_token']
+token = environ['main_token']
 CHARACTERISTICS = {'strength', 'agility', 'intelligence', 'lucky', 'wisdom', 'stamina'}
 
 HERO_SPELLS = ['Усиленный удар']
@@ -1103,8 +1103,7 @@ def send_text(message):
         elif message.text.lower() == 'регистрация и удаление старого аккаунта':
             begin_reg(message)
         else:
-            bot.send_message(message.chat.id, 'Err', reply_markup=keyboard_main)
-
+            bot.send_message(message.chat.id, 'Вы, кажется, ошиблись', reply_markup=keyboard_main)
         # write_class(message.chat.id, classes[message.chat.id])
     except Exception as e:
         bot.send_message(message.chat.id, 'Возможно ты не зарегистрировался',
