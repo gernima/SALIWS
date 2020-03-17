@@ -6,8 +6,8 @@ from os import environ
 from time import sleep
 
 dotenv.load_dotenv()
-token = environ['dev_token']
-# token = environ['main_token']
+# token = environ['dev_token']
+token = environ['main_token']
 CHARACTERISTICS = {'strength', 'agility', 'intelligence', 'lucky', 'wisdom', 'stamina'}
 
 HERO_SPELLS = ['Усиленный удар']
@@ -92,7 +92,7 @@ def get_block_from_stamina(stamina):
 
 
 def message_cd():
-    sleep(0.3)
+    sleep(0)
 
 
 class Enemy:
@@ -483,10 +483,11 @@ class Logic:
                                  reply_markup=self.characteristic_keyboard())
                 bot.send_message(self.id, 'Нажмите играть для продолжения', reply_markup=keyboard_main)
             elif butt == '💼':
-                if len(self.inventory) != 0:
-                    bot.send_message(self.id, 'Ваш инвентарь:', reply_markup=self.create_inventory_keyboard())
-                else:
-                    bot.send_message(self.id, 'Ваш инвентарь пуст', reply_markup=keyboard_move)
+                print(self.inventory)
+                # if len(self.inventory) != 0:
+                bot.send_message(self.id, 'Ваш инвентарь:', reply_markup=classes[self.id].create_inventory_keyboard())
+                # else:
+                #     bot.send_message(self.id, 'Ваш инвентарь пуст', reply_markup=keyboard_move)
                 bot.register_next_step_handler(message, self.hero_move)
             else:
                 bot.send_message(self.id, 'Вы, кажется, ошиблись действием', reply_markup=keyboard_move)
@@ -597,6 +598,10 @@ class Logic:
 
     def inventory_add_item(self, item):
         self.inventory.append(item)
+        write_class(self.id, self)
+        read_class(self.id)
+        print('1', self.inventory)
+        # bot.send_message(self.id, 'append', reply_markup=self.create_inventory_keyboard())
 
     def drop_from_enemy(self, message, enemy):
         self.drop_items = []
@@ -944,7 +949,7 @@ def drop_from_enemy(call):
 @bot.callback_query_handler(func=lambda call: 'drop_from_enemy_' in call.data)
 def drop_from_enemy(call):
     read_class(call.from_user.id)
-    if len(classes[call.from_user.id].invetory) != classes[call.from_user.id].invetory_max_slots:
+    if len(classes[call.from_user.id].inventory) != classes[call.from_user.id].inventory_max_slots:
         text = call.data[16:]
         item = classes[call.from_user.id].drop_items.pop(int(text))
         classes[call.from_user.id].inventory_add_item(item)
