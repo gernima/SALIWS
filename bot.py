@@ -1140,6 +1140,7 @@ def send_text(message):
         read_class(message.chat.id)
         if message.text.lower() == '/':
             classes[message.chat.id].gold += 1000
+            write_class(message.chat.id, classes[message.chat.id])
             bot.send_message(message.chat.id, 'Привет, мой создатель')
             # bot.send_message(message.chat.id, '🌲', reply_markup=keyboard1)
         elif message.text.lower() == 'играть':
