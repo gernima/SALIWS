@@ -1087,7 +1087,7 @@ def start_message(message):
         read_class(message.chat.id)
     except:
         print(
-            f'registration chat id: {message.chat.id} user name and surname {message.from_user.first_name, message.from_user.las_name}')
+            f'registration chat id: {message.chat.id} user name and surname {message.from_user.first_name, message.from_user.last_name}')
     if message.chat.id not in classes:
         begin_reg(message)
 
