@@ -911,7 +911,7 @@ def dialog_with_sewer_spells_shop_query_handler(call):
         edit_message_in_inline(call, 'Все, что я могу предложить:',
                                classes[call.from_user.id].keyboard_sewer_skins_shop())
     elif call.data[z:] in SEWER_SKINS_SHOP.keys():
-        classes[call.from_user.id].gold += 1000
+        # classes[call.from_user.id].gold += 1000
         if classes[call.from_user.id].gold >= SEWER_SKINS_SHOP[call.data[z:]]:
             add_skin = call.data[z:]
             edit_message_in_inline(call, f'Вы хотите приобрести {call.data[z:]}?',
@@ -975,7 +975,7 @@ def yes_or_no_spells(call):
     if call.data == 'librarian_spells_shop_yes':
         classes[call.from_user.id].add_spell(add_spell)
         write_class(call.from_user.id, classes[call.from_user.id])
-        edit_message_in_inline(call, f'Вы приобрели {add_spell}', classes[call.from_user.id].keyboard_spells_shop())
+        edit_message_in_inline(call, f'Вы приобрели {add_spell}', classes[call.from_user.id].keyboard_librarian_spells_shop())
     else:
         edit_message_in_inline(call, 'Может быть вы хотите что-то еще?',
                                classes[call.from_user.id].keyboard_spells_shop())
@@ -993,6 +993,7 @@ def edit_message_in_inline(call, text, keyboard=None):
 @bot.callback_query_handler(func=lambda call: 'librarian_spells_shop' in call.data)
 def dialog_with_librarian_spells_shop_query_handler(call):
     global add_spell
+    read_class(call.from_user.id)
     if call.data == 'librarian_spells_shop':
         edit_message_in_inline(call, 'Все, что я могу предложить:',
                                classes[call.from_user.id].keyboard_librarian_spells_shop())
@@ -1138,6 +1139,7 @@ def send_text(message):
     try:
         read_class(message.chat.id)
         if message.text.lower() == '/':
+            classes[message.chat.id].gold += 1000
             bot.send_message(message.chat.id, 'Привет, мой создатель')
             # bot.send_message(message.chat.id, '🌲', reply_markup=keyboard1)
         elif message.text.lower() == 'играть':
