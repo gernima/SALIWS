@@ -381,7 +381,7 @@ class Logic:
     def check_death(self, keyboard, message):
         if self.hp <= 0:
             self.death(message, keyboard)
-            self.send_map(keyboard_move)
+            self.send_map(keyboard)
             return True
         # else:
         #     bot.register_next_step_handler(message, self.fight, enemy)
@@ -646,17 +646,21 @@ class Logic:
                 bot.register_next_step_handler(message, self.hero_move)
             else:
                 enemy.fight_logic(message=message, chance_per_percent=0.5)
+                tf = True
                 if enemy.you_skip_step_n != 0:
                     for i in range(enemy.you_skip_step_n):
                         if self.check_death(keyboard_move, message):
+                            tf = False
                             bot.register_next_step_handler(message, self.hero_move)
-                        bot.send_message(message.chat.id, 'Вы пропускаете ход', reply_markup=keyboard_fight)
-                        enemy.fight_logic(message=message, chance_per_percent=0.5)
+                        elif tf:
+                            bot.send_message(message.chat.id, 'Вы пропускаете ход', reply_markup=keyboard_fight)
+                            enemy.fight_logic(message=message, chance_per_percent=0.5)
                     enemy.you_skip_step_n = 0
-                if self.check_death(keyboard_move, message):
-                    bot.register_next_step_handler(message, self.hero_move)
-                else:
-                    bot.register_next_step_handler(message, self.fight, enemy)
+                if tf:
+                    if self.check_death(keyboard_move, message):
+                        bot.register_next_step_handler(message, self.hero_move)
+                    else:
+                        bot.register_next_step_handler(message, self.fight, enemy)
 
     def fight_block(self, message, enemy):
         # damage = round(self.damage - enemy.block, 1)
