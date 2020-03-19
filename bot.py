@@ -478,7 +478,7 @@ class Logic:
                 self.check_move(message, obj, 4, self.y, self.x - 1)
             elif butt == '📚':
                 bot.send_message(self.id,
-                                 f"Ник: {self.name}\nОпыт: {self.xp}/{self.hero_need_xp}\nСпособности: {', '.join(self.spells_list)}\nСкин:\nПрокачка характеристик:",
+                                 f"Ник: {self.name}\nОпыт: {self.xp}/{self.hero_need_xp}\nСпособности: {', '.join(self.spells_list)}\nСкин: {self.hero_skin}\nПрокачка характеристик:",
                                  reply_markup=self.characteristic_keyboard())
                 bot.send_message(self.id, 'Нажмите играть для продолжения', reply_markup=keyboard_main)
             elif butt == '💼':
