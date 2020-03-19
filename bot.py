@@ -1,5 +1,5 @@
 import telebot
-import pickle
+from pickle import load, dump
 from random import randint
 import dotenv
 from os import environ
@@ -11,16 +11,15 @@ token = environ['main_token']
 CHARACTERISTICS = {'strength', 'agility', 'intelligence', 'lucky', 'wisdom', 'stamina'}
 
 HERO_SPELLS = ['Усиленный удар']
+HERO_SPELLS_GOLD_COST = {'Усиленный удар': 150}
 HERO_SPELLS_DESCRIPTION = {
-    'Усиленный удар': "Вы используете свои силы, пытаясь как можно сильнее ударить противника\nНаносите 110% вашего урона\nЦена: 15 золота"}
-HERO_SPELLS_GOLD_COST = {'Усиленный удар': 100}
+    'Усиленный удар': f"Вы используете свои силы, пытаясь как можно сильнее ударить противника\nНаносите 110% вашего урона\nЦена: {HERO_SPELLS_GOLD_COST['Усиленный удар']} золота"}
 HERO_SPELLS_MP_COST = {'Усиленный удар': 5}
 HERO_SPELLS_CD = {'Усиленный удар': 3}
 HERO_SPELLS_LIBRARY_COST = {'Усиленный удар': 100}
 
-SEWER_SKINS_SHOP = {'🤡': 100, '😒': 100, '😡': 100, '🤓': 100, '😀': 100, '😈': 100, '💩': 100, '👻': 100, '👺': 100,
-                    '👹': 100,
-                    '👿': 100, '💀': 100}
+SEWER_SKINS_SHOP = {'🤡': 100, '😒': 100, '😡': 100, '🤓': 100, '😀': 100, '😈': 100,
+                    '💩': 100, '👻': 100, '👺': 100, '👹': 100, '👿': 100, '💀': 100}
 
 ITEMS_DESCRIPTION = {'Паутина': 'Обычная паутина, которая может выпасть с паука'}
 ITEMS_USED = {}
@@ -42,12 +41,12 @@ BASIC_DODGE = 5
 def write_class(chat_id, b):
     classes[chat_id] = b
     with open('saves/{}.txt'.format(chat_id), 'wb') as out:
-        pickle.dump(b, out)
+        dump(b, out)
 
 
 def read_class(chat_id):
     with open('saves/{}.txt'.format(chat_id), 'rb') as f:
-        classes[chat_id] = pickle.load(f)
+        classes[chat_id] = load(f)
 
 
 def get_damage_from_strength(strength):
@@ -479,16 +478,18 @@ class Logic:
                 self.check_move(message, obj, 4, self.y, self.x - 1)
             elif butt == '📚':
                 bot.send_message(self.id,
-                                 "Прокачка характеристик:",
+                                 f"Ник: {self.name}\nОпыт: {self.xp}/{self.hero_need_xp}\nСпособности: {', '.join(self.spells_list)}\nСкин:\nПрокачка характеристик:",
                                  reply_markup=self.characteristic_keyboard())
                 bot.send_message(self.id, 'Нажмите играть для продолжения', reply_markup=keyboard_main)
             elif butt == '💼':
-                print(self.inventory)
                 # if len(self.inventory) != 0:
                 bot.send_message(self.id, 'Ваш инвентарь:', reply_markup=classes[self.id].create_inventory_keyboard())
                 # else:
                 #     bot.send_message(self.id, 'Ваш инвентарь пуст', reply_markup=keyboard_move)
                 bot.register_next_step_handler(message, self.hero_move)
+            elif butt == 'Главное меню':
+                bot.send_message(self.id, 'Вы перешли в главное меню', reply_markup=keyboard_main)
+                bot.register_next_step_handler(message, send_text)
             else:
                 bot.send_message(self.id, 'Вы, кажется, ошиблись действием', reply_markup=keyboard_move)
         except:
@@ -501,7 +502,7 @@ class Logic:
 
     def load_from_file_map(self):
         with open('levels/{}.txt'.format(self.map), 'rb') as f:
-            self.map_list = pickle.load(f)
+            self.map_list = load(f)
         self.map_list[self.y][self.x] = self.hero_skin
 
     def from_list_to_str_map(self):
@@ -538,7 +539,7 @@ class Logic:
     def fight_spells(self, message, enemy):
         text = message.text.lower()
         if text == 'назад':
-            bot.send_message(message.chat.id, 'Хорошо', reply_markup=keyboard_fight)
+            bot.send_message(message.chat.id, 'Вы в бою', reply_markup=keyboard_fight)
             bot.register_next_step_handler(message, self.fight, enemy)
         elif text == 'усиленный удар':
             bot.send_message(message.chat.id, f'Вы использовали {text}, вы наносите 110% урона')
@@ -600,7 +601,7 @@ class Logic:
         self.inventory.append(item)
         write_class(self.id, self)
         read_class(self.id)
-        print('1', self.inventory)
+        print(self.id, self.inventory)
         # bot.send_message(self.id, 'append', reply_markup=self.create_inventory_keyboard())
 
     def drop_from_enemy(self, message, enemy):
@@ -975,7 +976,8 @@ def yes_or_no_spells(call):
     if call.data == 'librarian_spells_shop_yes':
         classes[call.from_user.id].add_spell(add_spell)
         write_class(call.from_user.id, classes[call.from_user.id])
-        edit_message_in_inline(call, f'Вы приобрели {add_spell}', classes[call.from_user.id].keyboard_librarian_spells_shop())
+        edit_message_in_inline(call, f'Вы приобрели {add_spell}',
+                               classes[call.from_user.id].keyboard_librarian_spells_shop())
     else:
         edit_message_in_inline(call, 'Может быть вы хотите что-то еще?',
                                classes[call.from_user.id].keyboard_spells_shop())
