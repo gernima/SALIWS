@@ -10,30 +10,19 @@ token = environ['dev_token']
 # token = environ['main_token']
 CHARACTERISTICS = {'strength', 'agility', 'intelligence', 'lucky', 'wisdom', 'stamina'}
 
-HERO_SPELLS = ['Усиленный удар']
-HERO_SPELLS_GOLD_COST = {'Усиленный удар': 150}
-HERO_SPELLS_DESCRIPTION = {
-    'Усиленный удар': f"Вы используете свои силы, пытаясь как можно сильнее ударить противника\nНаносите 110% вашего урона\nЦена: {HERO_SPELLS_GOLD_COST['Усиленный удар']} золота"}
-HERO_SPELLS_MP_COST = {'Усиленный удар': 5}
-HERO_SPELLS_CD = {'Усиленный удар': 3}
-HERO_SPELLS_LIBRARY_COST = {'Усиленный удар': 100}
+HERO = {'spells': {'Усиленный удар': {'librarian_gold': 100, 'cd': 3, 'mp': 5,
+                                      'des': f"Вы используете свои силы, пытаясь как можно сильнее ударить противника\nНаносите 110% вашего урона\nЦена: {100} золота"}}}
 
 SEWER_SKINS_SHOP = {'🤡': 100, '😒': 100, '😡': 100, '🤓': 100, '😀': 100, '😈': 100,
                     '💩': 100, '👻': 100, '👺': 100, '👹': 100, '👿': 100, '💀': 100}
 
-ITEMS_DESCRIPTION = {'Паутина': 'Обычная паутина, которая может выпасть с паука'}
-ITEMS_USED = {}
+ITEMS = {'Паутина': {'des': {'Обычная паутина, которая может выпасть с паука'}, 'used': False}}
 
-ENEMIES_SPELLS = {'Паук': {'Защита паутиной': 10, 'Опутывание паутиной': 8}}
-# ENEMIES_SPELLS_COST = {}
-ENEMIES_XP = {'Паук': 5}
-ENEMIES_SKINS = {'Паук': '🕷'}
-ENEMIES_ITEM_DROP = {'Паук': {'Паутина': 1}}
-ENEMIES_GOLD_DROP = {'Паук': 10}
-ENEMIES_GOLD_DROP_EDIT = {'Паук': 3}
+ENEMIES = {'skins': ['🕷'], 'Паук': {'spells': {'Защита паутиной': 10, 'Опутывание паутиной': 8}}, 'xp': 5, 'skin': '🕷',
+           'drop_item': {'Паутина': 1}, 'drop_gold': 10, 'drop_gold_edit': 3}
 
-QUESTS = {"Сбор паутины для швеи": {'things': {"Паутина": 5}, 'time_repeat': 3600, 'time_accept': 0, 'is_active': False, 'description': 'Не мог бы ты собрать для меня 5 паутинок?'}}
-QUESTS_XP = {"Сбор паутины для швеи": 20}
+QUESTS = {"Сбор паутины": {'things': {"Паутина": 5}, 'time_repeat': 3600, 'time_accept': 0, 'is_active': False,
+                           'des': 'Не мог бы ты собрать для меня 5 паутинок?', 'xp': 20}}
 
 BASIC_DODGE = 5
 
@@ -233,9 +222,9 @@ class Spider(Enemy):
     def spell_use(self, name, chat_id):
         super().spell_use(name, chat_id)
         chance_of_activation = randint(1, 100)
-        chance = 100 // len(ENEMIES_SPELLS[name])
+        chance = 100 // len(ENEMIES[name]['spells'])
         n = 0
-        for spell, spell_mp in ENEMIES_SPELLS[name].items():
+        for spell, spell_mp in ENEMIES[name]['spells'].items():
             n += 1
             if self.mp >= spell_mp:
                 if n * chance >= chance_of_activation:
@@ -396,11 +385,11 @@ class Logic:
         self.send_map(keyboard_move)
 
     def check_move(self, message, obj, forward, y, x):
-        if obj in ENEMIES_SKINS.values():
+        if obj in ENEMIES['skins']:
             bot.send_message(self.id, 'Вы напали на' + obj)
-            if obj == ENEMIES_SKINS["Паук"]:
-                enemy = Spider(spells_list=ENEMIES_SPELLS['Паук'], lvl=2, xp=ENEMIES_XP['Паук'],
-                               target=self, skin=ENEMIES_SKINS['Паук'], strength=2, agility=3, lucky=0,
+            if obj == ENEMIES["Паук"]['skins']:
+                enemy = Spider(spells_list=ENEMIES['Паук']['spells'], lvl=2, xp=ENEMIES['Паук']['xp'],
+                               target=self, skin=ENEMIES['Паук']['skin'], strength=2, agility=3, lucky=0,
                                intelligence=2, wisdom=1, stamina=2, name='Паук', enhancement_n=0, x=x, y=y)
             bot.send_message(self.id,
                              'У вас {}❤ {}💛'.format(self.hp, self.mp, enemy.hp),
@@ -611,13 +600,13 @@ class Logic:
 
     def drop_from_enemy(self, message, enemy):
         self.drop_items = []
-        gold_edit = randint(-1 * ENEMIES_GOLD_DROP_EDIT[enemy.name], ENEMIES_GOLD_DROP_EDIT[enemy.name])
-        gold_drop = ENEMIES_GOLD_DROP[enemy.name] + gold_edit
+        gold_edit = randint(-1 * ENEMIES[enemy.name]['drop_gold_edit'], ENEMIES[enemy.name]['drop_gold_edit'])
+        gold_drop = ENEMIES[enemy.name]['drop_gold'] + gold_edit
         self.gold += gold_drop
         bot.send_message(self.id, f"Выпало {gold_drop} золота\nВаш баланс: {self.gold}")
-        for item in ENEMIES_ITEM_DROP[enemy.name].keys():
+        for item in ENEMIES[enemy.name]['drop_item'].keys():
             chance = randint(1, 100)
-            if chance <= ENEMIES_ITEM_DROP[enemy.name][item] * 100:
+            if chance <= ENEMIES[enemy.name]['drop_item'][item] * 100:
                 self.drop_items.append(item)
         if self.drop_items != 0:
             bot.send_message(message.chat.id, "Выберите, что хотите подобрать")
@@ -782,7 +771,7 @@ class Logic:
         librarian_spells_shop_spell = telebot.types.InlineKeyboardButton(text='Назад',
                                                                          callback_data="librarian_spells_shop_return")
         keyboard.add(librarian_spells_shop_spell)
-        new_spells = HERO_SPELLS
+        new_spells = list(HERO['spells'].keys())
         for spell in self.spells_list:
             if spell in new_spells:
                 new_spells.remove(spell)
@@ -975,7 +964,8 @@ def quest(name, call):
     global add_quest
     read_class(call.from_user.id)
     if classes[call.from_user.id].quests[name]['is_active'] is False:
-        if (classes[call.from_user.id].quests[name]['time_accept'] + classes[call.from_user.id].quests[name]['time_repeat']) <= time():
+        if (classes[call.from_user.id].quests[name]['time_accept'] + classes[call.from_user.id].quests[name][
+            'time_repeat']) <= time():
             edit_message_in_inline(call, QUESTS[name]['description'], keyboard_quest_yes_or_no)
             add_quest = name
         else:
@@ -996,13 +986,13 @@ def inventory(call):
                                classes[call.from_user.id].create_inventory_keyboard())
     else:
         try:
-            edit_message_in_inline(call, classes[call.from_user.id].inventory[int(text)],
+            edit_message_in_inline(call, ITEMS[classes[call.from_user.id].inventory[int(text)]]['des'],
                                    keyboard_return_in_inventory)
         except Exception as e:
-            edit_message_in_inline(call, e,
+            print('inventory', e)
+            edit_message_in_inline(call,
+                                   "Ошибка, сообщите об этом поддержке с подробным описанием ваших действий перед ошибкой",
                                    keyboard_return_in_inventory)
-        # edit_message_in_inline(call, ITEMS_DESCRIPTION[classes[call.from_user.id].inventory[int(text)]],
-        #                        keyboard_return_in_inventory)
     # write_class(call.from_user.id, classes[call.from_user.id])
 
 
@@ -1057,11 +1047,11 @@ def dialog_with_librarian_spells_shop_query_handler(call):
     if call.data == 'librarian_spells_shop':
         edit_message_in_inline(call, 'Все, что я могу предложить:',
                                classes[call.from_user.id].keyboard_librarian_spells_shop())
-    elif call.data[22:] in HERO_SPELLS:
-        if classes[call.from_user.id].gold >= HERO_SPELLS_GOLD_COST[call.data[22:]]:
+    elif call.data[22:] in list(HERO['spells'].keys()):
+        if classes[call.from_user.id].gold >= HERO['spells'][call.data[22:]]['librarian_gold']:
             edit_message_in_inline(call,
-                                   HERO_SPELLS_DESCRIPTION[
-                                       call.data[22:]] + '\n' + f'Вы хотите приобрести {call.data[22:]}?',
+                                   HERO['spells'][call.data[22:]][
+                                       'des'] + '\n' + f'Вы хотите приобрести {call.data[22:]}?',
                                    keyboard_librarian_spells_shop_yes_or_no)
             add_spell = call.data[22:]
         else:
@@ -1174,7 +1164,7 @@ def reg_name(message):
         bot.register_next_step_handler(message, yon_name, name)
     else:
         bot.send_message(message.chat.id, "Длина ника не должна превышать 24 символа".format(name))
-        bot.register_next_step_handler(message, yon_name, name)
+        bot.register_next_step_handler(message, reg_name, name)
 
 
 def yon_name(message, name):
