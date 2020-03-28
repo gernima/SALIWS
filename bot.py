@@ -1,13 +1,13 @@
 import telebot
 from pickle import load, dump
 from random import randint
-import dotenv
+from dotenv import load_dotenv
 from os import environ
-from time import sleep
+from time import sleep, time
 
-dotenv.load_dotenv()
-# token = environ['dev_token']
-token = environ['main_token']
+load_dotenv()
+token = environ['dev_token']
+# token = environ['main_token']
 CHARACTERISTICS = {'strength', 'agility', 'intelligence', 'lucky', 'wisdom', 'stamina'}
 
 HERO_SPELLS = ['Усиленный удар']
@@ -32,7 +32,7 @@ ENEMIES_ITEM_DROP = {'Паук': {'Паутина': 1}}
 ENEMIES_GOLD_DROP = {'Паук': 10}
 ENEMIES_GOLD_DROP_EDIT = {'Паук': 3}
 
-QUESTS = {"Сбор паутины для швеи": {"Паутина": 5}}
+QUESTS = {"Сбор паутины для швеи": {'things': {"Паутина": 5}, 'time_repeat': 3600, 'time_accept': 0, 'is_active': False, 'description': 'Не мог бы ты собрать для меня 5 паутинок?'}}
 QUESTS_XP = {"Сбор паутины для швеи": 20}
 
 BASIC_DODGE = 5
@@ -300,6 +300,8 @@ class Logic:
         self.inventory = []
         self.inventory_max_slots = 10
 
+        self.quests = {v: QUESTS[v] for v, k in QUESTS.items()}
+
     def damaging(self, damage):
         if self.block > 0:
             self.hp = round(self.hp - damage + self.block, 1)
@@ -380,7 +382,6 @@ class Logic:
     def check_death(self, keyboard, message):
         if self.hp <= 0:
             self.death(message, keyboard)
-            self.send_map(keyboard)
             return True
         # else:
         #     bot.register_next_step_handler(message, self.fight, enemy)
@@ -437,7 +438,8 @@ class Logic:
                 bot.register_next_step_handler(message, self.hero_move)
         elif obj == '👰🏼':
             if self.map == 'sewing':
-                bot.send_message(self.id, 'Вы начали разговор с библиотекарем', reply_markup=keyboard_sewer)
+                write_class(self.id, self)
+                bot.send_message(self.id, 'Вы начали разговор со швеей', reply_markup=keyboard_sewer)
                 bot.register_next_step_handler(message, self.hero_move)
         elif obj == '📚':
             if self.map == 'town':
@@ -482,18 +484,20 @@ class Logic:
                                  reply_markup=self.characteristic_keyboard())
                 bot.send_message(self.id, 'Нажмите играть для продолжения', reply_markup=keyboard_main)
             elif butt == '💼':
+                read_class(self.id)
                 # if len(self.inventory) != 0:
                 bot.send_message(self.id, 'Ваш инвентарь:', reply_markup=classes[self.id].create_inventory_keyboard())
                 # else:
                 #     bot.send_message(self.id, 'Ваш инвентарь пуст', reply_markup=keyboard_move)
-                bot.register_next_step_handler(message, self.hero_move)
+                write_class(self.id, classes[self.id])
+                bot.register_next_step_handler(message, classes[self.id].hero_move)
             elif butt == 'Главное меню':
                 bot.send_message(self.id, 'Вы перешли в главное меню', reply_markup=keyboard_main)
                 bot.register_next_step_handler(message, send_text)
             else:
                 bot.send_message(self.id, 'Вы, кажется, ошиблись действием', reply_markup=keyboard_move)
         except:
-            bot.send_message(self.id, 'Не выходите за границы', reply_markup=keyboard_move)
+            bot.send_message(self.id, 'Осторожно!', reply_markup=keyboard_move)
             bot.register_next_step_handler(message, self.hero_move)
         write_class(message.chat.id, self)
 
@@ -601,7 +605,7 @@ class Logic:
         self.inventory.append(item)
         write_class(self.id, self)
         read_class(self.id)
-        print(self.id, self.inventory)
+        print(self.id, self.inventory, classes[self.id].inventory)
         # bot.send_message(self.id, 'append', reply_markup=self.create_inventory_keyboard())
 
     def drop_from_enemy(self, message, enemy):
@@ -759,10 +763,12 @@ class Logic:
 
     def create_inventory_keyboard(self):
         keyboard = telebot.types.InlineKeyboardMarkup()
-        for i in range(len(self.inventory)):
-            item_button = telebot.types.InlineKeyboardButton(text=self.inventory[i],
+        for i in range(len(classes[self.id].inventory)):
+            item_button = telebot.types.InlineKeyboardButton(text=classes[self.id].inventory[i],
                                                              callback_data=f"inventory_{i}")
             keyboard.add(item_button)
+        write_class(self.id, self)
+        read_class(self.id)
         return keyboard
 
     """
@@ -872,6 +878,9 @@ keyboard_sewer.add(sewer_talk)
 sewer_spells_shop = telebot.types.InlineKeyboardButton(text="Магазин скинов",
                                                        callback_data="sewer_skins_shop")
 keyboard_sewer.add(sewer_spells_shop)
+sewer_spider_web = telebot.types.InlineKeyboardButton(text="Сбор паутины",
+                                                      callback_data="sewer_quest_spider_web")
+keyboard_sewer.add(sewer_spider_web)
 sewer_talk = telebot.types.InlineKeyboardButton(text="До свидания", callback_data="sewer_talk_bye")
 keyboard_sewer.add(sewer_talk)
 
@@ -889,6 +898,26 @@ classes = {}
 print('start')
 add_spell = ''
 add_skin = ''
+add_quest = ''
+keyboard_quest_yes_or_no = telebot.types.InlineKeyboardMarkup()
+sewer_skins_shop_yes = telebot.types.InlineKeyboardButton(text="Да",
+                                                          callback_data="quest_yes")
+sewer_skins_shop_no = telebot.types.InlineKeyboardButton(text="Нет",
+                                                         callback_data="quest_no")
+keyboard_quest_yes_or_no.add(sewer_skins_shop_yes, sewer_skins_shop_no)
+
+
+@bot.callback_query_handler(func=lambda call: 'quest_yes' == call.data or 'quest_no' == call.data)
+def dialog_with_sewer_query_handler(call):
+    if call.data == 'quest_yes':
+        read_class(call.from_user.id)
+        classes[call.from_user.id].quests[add_quest]['is_active'] = True
+        classes[call.from_user.id].quests[add_quest]['time_accept'] = time()
+        write_class(call.from_user.id, classes[call.from_user.id])
+        edit_message_in_inline(call, 'Вы приняли квест', keyboard_sewer)
+        print('accept')
+    else:
+        edit_message_in_inline(call, 'Хорошо', keyboard_sewer)
 
 
 @bot.callback_query_handler(
@@ -937,18 +966,42 @@ def dialog_with_sewer_query_handler(call):
         edit_message_in_inline(call, 'Пока!')
         bot.send_message(call.from_user.id, 'Вы закончили разговор со швеей', reply_markup=keyboard_move)
         classes[call.from_user.id].send_map(keyboard_move)
+    elif 'sewer_quest_spider_web' == call.data:
+        quest('Сбор паутины для швеи', call)
+
+
+def quest(name, call):
+    global add_quest
+    read_class(call.from_user.id)
+    if classes[call.from_user.id].quests[name]['is_active'] is False:
+        if (classes[call.from_user.id].quests[name]['time_accept'] + classes[call.from_user.id].quests[name]['time_repeat']) <= time():
+            edit_message_in_inline(call, QUESTS[name]['description'], keyboard_quest_yes_or_no)
+            add_quest = name
+        else:
+            edit_message_in_inline(call, "Вы уже принимали квест, идет перезарядка, подойдите позже")
+    else:
+        edit_message_in_inline(call, "Вы уже приняли квест", keyboard_sewer)
 
 
 @bot.callback_query_handler(func=lambda call: 'inventory_' in call.data)
-def drop_from_enemy(call):
+def inventory(call):
     text = call.data[10:]
     read_class(call.from_user.id)
     if text == 'return':
+        print('return', classes[call.from_user.id].inventory)
         edit_message_in_inline(call, 'Ваш инвентарь:',
                                classes[call.from_user.id].create_inventory_keyboard())
     else:
-        edit_message_in_inline(call, ITEMS_DESCRIPTION[classes[call.from_user.id].inventory[int(text)]],
-                               keyboard_return_in_inventory)
+        print(classes[call.from_user.id].inventory, text)
+        try:
+            edit_message_in_inline(call, classes[call.from_user.id].inventory[int(text)],
+                                   keyboard_return_in_inventory)
+        except Exception as e:
+            edit_message_in_inline(call, e,
+                                   keyboard_return_in_inventory)
+        # edit_message_in_inline(call, ITEMS_DESCRIPTION[classes[call.from_user.id].inventory[int(text)]],
+        #                        keyboard_return_in_inventory)
+        write_class(call.from_user.id, classes[call.from_user.id])
 
 
 @bot.callback_query_handler(func=lambda call: 'drop_from_enemy_' in call.data)
