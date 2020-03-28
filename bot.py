@@ -489,8 +489,8 @@ class Logic:
                 bot.send_message(self.id, 'Ваш инвентарь:', reply_markup=classes[self.id].create_inventory_keyboard())
                 # else:
                 #     bot.send_message(self.id, 'Ваш инвентарь пуст', reply_markup=keyboard_move)
-                write_class(self.id, classes[self.id])
-                bot.register_next_step_handler(message, classes[self.id].hero_move)
+                # write_class(self.id, classes[self.id])
+                bot.register_next_step_handler(message, self.hero_move)
             elif butt == 'Главное меню':
                 bot.send_message(self.id, 'Вы перешли в главное меню', reply_markup=keyboard_main)
                 bot.register_next_step_handler(message, send_text)
@@ -499,6 +499,7 @@ class Logic:
         except:
             bot.send_message(self.id, 'Осторожно!', reply_markup=keyboard_move)
             bot.register_next_step_handler(message, self.hero_move)
+        self.inventory = classes[self.id].inventory
         write_class(message.chat.id, self)
 
     def set_map(self, new_map_name):
@@ -767,8 +768,8 @@ class Logic:
             item_button = telebot.types.InlineKeyboardButton(text=classes[self.id].inventory[i],
                                                              callback_data=f"inventory_{i}")
             keyboard.add(item_button)
-        write_class(self.id, self)
-        read_class(self.id)
+        # write_class(self.id, self)
+        # read_class(self.id)
         return keyboard
 
     """
@@ -986,13 +987,14 @@ def quest(name, call):
 @bot.callback_query_handler(func=lambda call: 'inventory_' in call.data)
 def inventory(call):
     text = call.data[10:]
+    print('1', classes[call.from_user.id].inventory, text)
     read_class(call.from_user.id)
+    print('2', classes[call.from_user.id].inventory, text)
     if text == 'return':
         print('return', classes[call.from_user.id].inventory)
         edit_message_in_inline(call, 'Ваш инвентарь:',
                                classes[call.from_user.id].create_inventory_keyboard())
     else:
-        print(classes[call.from_user.id].inventory, text)
         try:
             edit_message_in_inline(call, classes[call.from_user.id].inventory[int(text)],
                                    keyboard_return_in_inventory)
@@ -1001,7 +1003,7 @@ def inventory(call):
                                    keyboard_return_in_inventory)
         # edit_message_in_inline(call, ITEMS_DESCRIPTION[classes[call.from_user.id].inventory[int(text)]],
         #                        keyboard_return_in_inventory)
-        write_class(call.from_user.id, classes[call.from_user.id])
+    # write_class(call.from_user.id, classes[call.from_user.id])
 
 
 @bot.callback_query_handler(func=lambda call: 'drop_from_enemy_' in call.data)
@@ -1037,12 +1039,15 @@ def yes_or_no_spells(call):
 
 
 def edit_message_in_inline(call, text, keyboard=None):
-    msg = bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
-                                text=text,
-                                parse_mode='Markdown')
-    if keyboard is not None:
-        msg = bot.edit_message_reply_markup(call.from_user.id, call.message.message_id,
-                                            reply_markup=keyboard)
+    try:
+        msg = bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                                    text=text,
+                                    parse_mode='Markdown')
+        if keyboard is not None:
+            msg = bot.edit_message_reply_markup(call.from_user.id, call.message.message_id,
+                                                reply_markup=keyboard)
+    except Exception as e:
+        print(e, text, call.message.text)
 
 
 @bot.callback_query_handler(func=lambda call: 'librarian_spells_shop' in call.data)
