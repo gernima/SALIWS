@@ -10,3 +10,5 @@ while int(a) != int(cur_time + n):
     # print(a, a == cur_time)
 print(a)
 print(a - cur_time)
+
+
