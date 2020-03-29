@@ -6,8 +6,11 @@ from os import environ
 from time import sleep, time
 
 load_dotenv()
-# token = environ['dev_token']
-token = environ['main_token']
+if str(input('1 is main, another dev: ')) == '1':
+    token = environ['main_token']
+else:
+    token = environ['dev_token']
+
 CHARACTERISTICS = {'strength', 'agility', 'intelligence', 'lucky', 'wisdom', 'stamina'}
 
 HERO = {'spells': {'Усиленный удар': {'librarian_gold': 100, 'cd': 3, 'mp': 5,
@@ -21,12 +24,11 @@ SEWER_SKINS_SHOP = {'🤡': 100, '😒': 100, '😡': 100, '🤓': 100, '😀': 
 
 ITEMS = {'Паутина': {'des': {'Обычная паутина, которая может выпасть с паука'}, 'used': False}}
 
-ENEMIES = {'skins': ['🕷'], 'Паук': {'spells': {'Защита паутиной': 10, 'Опутывание паутиной': 8}}, 'xp': 5,
-           'skin': '🕷',
-           'drop_item': {'Паутина': 1}, 'drop_gold': 10, 'drop_gold_edit': 3}
+ENEMIES = {'skins': ['🕷'], 'Паук': {'spells': {'Защита паутиной': 10, 'Опутывание паутиной': 8}, 'xp': 5,
+                                     'skin': '🕷', 'drop_item': {'Паутина': 1}, 'drop_gold': 10, 'drop_gold_edit': 3}}
 
 QUESTS = {"Сбор паутины": {'things': {"Паутина": 5}, 'time_repeat': 3600, 'time_accept': 0, 'is_active': False,
-                           'des': 'Не мог бы ты собрать для меня 5 паутинок?', 'xp': 20}}
+                           'des': 'Не мог бы ты собрать для меня 5 паутинок?', 'xp': 20, 'reward': []}}
 
 
 def write_class(chat_id, b):
@@ -291,7 +293,7 @@ class Logic:
         self.inventory = []
         self.inventory_max_slots = 10
 
-        self.quests = {v: QUESTS[v] for v, k in QUESTS.items()}
+        self.quests = QUESTS
 
     def damaging(self, damage):
         if self.block > 0:
@@ -389,14 +391,13 @@ class Logic:
     def check_move(self, message, obj, forward, y, x):
         if obj in ENEMIES['skins']:
             bot.send_message(self.id, 'Вы напали на' + obj)
-            if obj == ENEMIES["Паук"]['skins']:
+            if obj == ENEMIES["Паук"]['skin']:
                 enemy = Spider(spells_list=ENEMIES['Паук']['spells'], lvl=2, xp=ENEMIES['Паук']['xp'],
                                target=self, skin=ENEMIES['Паук']['skin'], strength=2, agility=3, lucky=0,
                                intelligence=2, wisdom=1, stamina=2, name='Паук', enhancement_n=0, x=x, y=y)
             bot.send_message(self.id,
                              'У вас {}❤ {}💛'.format(self.hp, self.mp, enemy.hp),
                              reply_markup=keyboard_fight)
-
             bot.register_next_step_handler(message, self.fight, enemy)
         elif obj == '🌫':
             if forward == 1:  # ⬇️
@@ -456,7 +457,7 @@ class Logic:
 
     def hero_move(self, message):
         butt = message.text
-        try:
+        if self.x <= 11 and self.y <= 11:
             if butt == '⬇️':
                 obj = self.map_list[self.y + 1][self.x]
                 self.check_move(message, obj, 1, self.y + 1, self.x)
@@ -470,25 +471,23 @@ class Logic:
                 obj = self.map_list[self.y][self.x - 1]
                 self.check_move(message, obj, 4, self.y, self.x - 1)
             elif butt == '📚':
+                n = '\n'
                 bot.send_message(self.id,
-                                 f"Ник: {self.name}\nОпыт: {self.xp}/{self.hero_need_xp}\nСпособности: {', '.join(self.spells_list)}\nСкин: {self.hero_skin}\nПрокачка характеристик:",
-                                 reply_markup=self.characteristic_keyboard())
-                bot.send_message(self.id, 'Нажмите играть для продолжения', reply_markup=keyboard_main)
+                                 f"Ник: {classes[self.id].name}\nОпыт: {classes[self.id].xp}/{classes[self.id].hero_need_xp}\nСпособности: {', '.join(classes[self.id].spells_list)}\nСкин: {classes[self.id].hero_skin}\nКвесты: ({n.join(classes[self.id].quests[x]['des'] for x in QUESTS.keys() if classes[self.id].quests[x]['is_active'])})\nПрокачка характеристик:",
+                                 reply_markup=classes[self.id].characteristic_keyboard())
+                # bot.send_message(self.id, 'Нажмите играть для продолжения', reply_markup=keyboard_main)
+                bot.register_next_step_handler(message, classes[self.id].hero_move)
             elif butt == '💼':
                 read_class(self.id)
-                # if len(self.inventory) != 0:
                 bot.send_message(self.id, 'Ваш инвентарь:', reply_markup=classes[self.id].create_inventory_keyboard())
-                # else:
-                #     bot.send_message(self.id, 'Ваш инвентарь пуст', reply_markup=keyboard_move)
-                # write_class(self.id, classes[self.id])
                 bot.register_next_step_handler(message, self.hero_move)
             elif butt == 'Главное меню':
                 bot.send_message(self.id, 'Вы перешли в главное меню', reply_markup=keyboard_main)
                 bot.register_next_step_handler(message, send_text)
             else:
                 bot.send_message(self.id, 'Вы, кажется, ошиблись действием', reply_markup=keyboard_move)
-        except:
-            bot.send_message(self.id, 'Осторожно!', reply_markup=keyboard_move)
+        else:
+            bot.send_message(self.id, 'Не выходите за границы', reply_markup=keyboard_move)
             bot.register_next_step_handler(message, self.hero_move)
         self.inventory = classes[self.id].inventory
         write_class(message.chat.id, self)
@@ -899,25 +898,13 @@ print('start')
 add_spell = ''
 add_skin = ''
 add_quest = ''
+add_quest_keyboard = ''
 keyboard_quest_yes_or_no = telebot.types.InlineKeyboardMarkup()
 sewer_skins_shop_yes = telebot.types.InlineKeyboardButton(text="Да",
                                                           callback_data="quest_yes")
 sewer_skins_shop_no = telebot.types.InlineKeyboardButton(text="Нет",
                                                          callback_data="quest_no")
 keyboard_quest_yes_or_no.add(sewer_skins_shop_yes, sewer_skins_shop_no)
-
-
-@bot.callback_query_handler(func=lambda call: 'quest_yes' == call.data or 'quest_no' == call.data)
-def dialog_with_sewer_query_handler(call):
-    if call.data == 'quest_yes':
-        read_class(call.from_user.id)
-        classes[call.from_user.id].quests[add_quest]['is_active'] = True
-        classes[call.from_user.id].quests[add_quest]['time_accept'] = time()
-        write_class(call.from_user.id, classes[call.from_user.id])
-        edit_message_in_inline(call, 'Вы приняли квест', keyboard_sewer)
-        print('accept')
-    else:
-        edit_message_in_inline(call, 'Хорошо', keyboard_sewer)
 
 
 @bot.callback_query_handler(
@@ -967,32 +954,64 @@ def dialog_with_sewer_query_handler(call):
         bot.send_message(call.from_user.id, 'Вы закончили разговор со швеей', reply_markup=keyboard_move)
         classes[call.from_user.id].send_map(keyboard_move)
     elif 'sewer_quest_spider_web' == call.data:
-        quest('Сбор паутины для швеи', call)
+        quest('Сбор паутины', call, keyboard_sewer)
 
 
-def quest(name, call):
-    global add_quest
+@bot.callback_query_handler(func=lambda call: 'quest_yes' == call.data or 'quest_no' == call.data)
+def yes_or_no_quest(call):
     read_class(call.from_user.id)
-    if classes[call.from_user.id].quests[name]['is_active'] is False:
-        if (classes[call.from_user.id].quests[name]['time_accept'] +
-            classes[call.from_user.id].quests[name]['time_repeat']) <= time():
-            edit_message_in_inline(call, QUESTS[name]['description'], keyboard_quest_yes_or_no)
-            add_quest = name
-        else:
-            edit_message_in_inline(call, "Вы уже принимали квест, идет перезарядка, подойдите позже")
+    if call.data == 'quest_yes':
+        classes[call.from_user.id].quests[add_quest]['is_active'] = True
+        classes[call.from_user.id].quests[add_quest]['time_accept'] = time()
+        write_class(call.from_user.id, classes[call.from_user.id])
+        print(f'{classes[call.from_user.id].id} {classes[call.from_user.id].name} взял {add_quest}')
+        edit_message_in_inline(call, 'Вы приняли квест!', add_quest_keyboard)
     else:
-        if classes[call.from_user.id].inventory.count()
-        edit_message_in_inline(call, "Вы уже приняли квест", keyboard_sewer)
+        edit_message_in_inline(call, 'Вы отказались от квеста!', add_quest_keyboard)
+
+
+def quest(name, call, keyboard):
+    global add_quest, add_quest_keyboard
+    read_class(call.from_user.id)
+    added = {k: QUESTS[k] for k, v in QUESTS.items() if k not in classes[
+        call.from_user.id].quests}  # добавить квестов если их нет в списке квестов в классе logic
+    for k, v in added.items():
+        classes[call.from_user.id].quests[k] = v
+    if classes[call.from_user.id].quests[name]['is_active'] is False:
+        if (classes[call.from_user.id].quests[name]['time_accept'] + classes[call.from_user.id].quests[name][
+            'time_repeat']) <= time():
+            edit_message_in_inline(call, QUESTS[name]['des'], keyboard_quest_yes_or_no)
+            add_quest = name
+            add_quest_keyboard = keyboard
+        else:
+            edit_message_in_inline(call, "Вы уже принимали квест, идет перезарядка, подойдите позже", keyboard)
+    else:
+        tf = False
+        for item_for_q in QUESTS[name]['things'].keys():
+            if classes[call.from_user.id].inventory.count(item_for_q) >= QUESTS[name]['things'][item_for_q]:
+                tf = True
+            else:
+                tf = False
+                break
+        if tf:
+            print(f'{classes[call.from_user.id].id} {classes[call.from_user.id].name} выполнил {name}')
+            for item in QUESTS[name]['things'].keys():
+                for i in range(QUESTS[name]['things'][item]):
+                    classes[call.from_user.id].inventory.remove(item)
+            classes[call.from_user.id].quests[name]['is_active'] = False
+            write_class(call.from_user.id, classes[call.from_user.id])
+            edit_message_in_inline(call,
+                                   f"Вы выполнили квест и получаете: {QUESTS[name]['xp']} опыта\n {', '.join(QUESTS[name]['reward'])}",
+                                   keyboard)
+        else:
+            edit_message_in_inline(call, "Вы еще не выполнили квест", keyboard)
 
 
 @bot.callback_query_handler(func=lambda call: 'inventory_' in call.data)
 def inventory(call):
     text = call.data[10:]
-    print('1', classes[call.from_user.id].inventory, text)
     read_class(call.from_user.id)
-    print('2', classes[call.from_user.id].inventory, text)
     if text == 'return':
-        print('return', classes[call.from_user.id].inventory)
         edit_message_in_inline(call, 'Ваш инвентарь:',
                                classes[call.from_user.id].create_inventory_keyboard())
     else:
@@ -1004,7 +1023,6 @@ def inventory(call):
             edit_message_in_inline(call,
                                    "Ошибка, сообщите об этом поддержке с подробным описанием ваших действий перед ошибкой",
                                    keyboard_return_in_inventory)
-    # write_class(call.from_user.id, classes[call.from_user.id])
 
 
 @bot.callback_query_handler(func=lambda call: 'drop_from_enemy_' in call.data)
@@ -1144,7 +1162,7 @@ def characteristic_query_handler(call):
                                       reply_markup=classes[call.from_user.id].characteristic_keyboard())
     else:
         bot.answer_callback_query(callback_query_id=call.id,
-                                  text='У вас нет очков характеристик, чтобы их получить повысьте ваш уровень')
+                                  text='У вас нет очков характеристик, повысьте ваш уровень')
 
 
 @bot.message_handler(commands=['start'])
@@ -1201,6 +1219,8 @@ def send_text(message):
         read_class(message.chat.id)
         if message.text.lower() == '/':
             classes[message.chat.id].gold += 1000
+            for i in range(5):
+                classes[message.chat.id].inventory.append('Паутина')
             write_class(message.chat.id, classes[message.chat.id])
             bot.send_message(message.chat.id, 'Привет, мой создатель')
             # bot.send_message(message.chat.id, '🌲', reply_markup=keyboard1)
