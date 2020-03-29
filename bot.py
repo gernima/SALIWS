@@ -6,25 +6,27 @@ from os import environ
 from time import sleep, time
 
 load_dotenv()
-token = environ['dev_token']
-# token = environ['main_token']
+# token = environ['dev_token']
+token = environ['main_token']
 CHARACTERISTICS = {'strength', 'agility', 'intelligence', 'lucky', 'wisdom', 'stamina'}
 
 HERO = {'spells': {'Усиленный удар': {'librarian_gold': 100, 'cd': 3, 'mp': 5,
-                                      'des': f"Вы используете свои силы, пытаясь как можно сильнее ударить противника\nНаносите 110% вашего урона\nЦена: {100} золота"}}}
+                                      'des': f"Вы используете свои силы, пытаясь как можно сильнее ударить противника\n"
+                                             f"Наносите 110% вашего урона\nЦена: {100} золота"}}}
+
+BASIC_CHARS = {'dodge': 5}
 
 SEWER_SKINS_SHOP = {'🤡': 100, '😒': 100, '😡': 100, '🤓': 100, '😀': 100, '😈': 100,
                     '💩': 100, '👻': 100, '👺': 100, '👹': 100, '👿': 100, '💀': 100}
 
 ITEMS = {'Паутина': {'des': {'Обычная паутина, которая может выпасть с паука'}, 'used': False}}
 
-ENEMIES = {'skins': ['🕷'], 'Паук': {'spells': {'Защита паутиной': 10, 'Опутывание паутиной': 8}}, 'xp': 5, 'skin': '🕷',
+ENEMIES = {'skins': ['🕷'], 'Паук': {'spells': {'Защита паутиной': 10, 'Опутывание паутиной': 8}}, 'xp': 5,
+           'skin': '🕷',
            'drop_item': {'Паутина': 1}, 'drop_gold': 10, 'drop_gold_edit': 3}
 
 QUESTS = {"Сбор паутины": {'things': {"Паутина": 5}, 'time_repeat': 3600, 'time_accept': 0, 'is_active': False,
                            'des': 'Не мог бы ты собрать для меня 5 паутинок?', 'xp': 20}}
-
-BASIC_DODGE = 5
 
 
 def write_class(chat_id, b):
@@ -109,7 +111,7 @@ class Enemy:
         self.damage = get_damage_from_strength(strength)
         self.block = 0
         self.block_add_int = get_block_from_stamina(stamina)
-        self.dodge = get_dodge_from_agility(agility) + BASIC_DODGE
+        self.dodge = get_dodge_from_agility(agility) + BASIC_CHARS['dodge']
         self.crit = get_crit_from_lucky(lucky)
         self.chance_of_loot = get_chance_of_loot_from_lucky(lucky)
 
@@ -272,7 +274,7 @@ class Logic:
         self.mp_regen = get_mp_regen_from_intelligence(self.intelligence) + get_mp_regen_from_wisdom(self.wisdom)
         self.damage = get_damage_from_strength(self.strength)
         self.block_add_int = get_block_from_stamina(self.stamina)
-        self.dodge = get_dodge_from_agility(self.agility) + BASIC_DODGE
+        self.dodge = get_dodge_from_agility(self.agility) + BASIC_CHARS['dodge']
         self.active_dodge = False
         self.crit = get_crit_from_lucky(self.lucky)
         self.chance_of_loot = get_chance_of_loot_from_lucky(self.lucky)
@@ -595,8 +597,7 @@ class Logic:
         self.inventory.append(item)
         write_class(self.id, self)
         read_class(self.id)
-        print(self.id, self.inventory, classes[self.id].inventory)
-        # bot.send_message(self.id, 'append', reply_markup=self.create_inventory_keyboard())
+        print(f'{self.id} {self.name} подобрал {item}')
 
     def drop_from_enemy(self, message, enemy):
         self.drop_items = []
@@ -785,6 +786,10 @@ class Logic:
     Librarian logic
     end
     """
+    """
+    Sewer logic
+    begin
+    """
 
     def keyboard_sewer_skins_shop(self):
         keyboard = telebot.types.InlineKeyboardMarkup(row_width=5)
@@ -804,6 +809,11 @@ class Logic:
                 a = []
                 n = 0
         return keyboard
+
+    """
+    Sewer logic
+    end
+    """
 
 
 bot = telebot.TeleBot(token)
@@ -964,13 +974,14 @@ def quest(name, call):
     global add_quest
     read_class(call.from_user.id)
     if classes[call.from_user.id].quests[name]['is_active'] is False:
-        if (classes[call.from_user.id].quests[name]['time_accept'] + classes[call.from_user.id].quests[name][
-            'time_repeat']) <= time():
+        if (classes[call.from_user.id].quests[name]['time_accept'] +
+            classes[call.from_user.id].quests[name]['time_repeat']) <= time():
             edit_message_in_inline(call, QUESTS[name]['description'], keyboard_quest_yes_or_no)
             add_quest = name
         else:
             edit_message_in_inline(call, "Вы уже принимали квест, идет перезарядка, подойдите позже")
     else:
+        if classes[call.from_user.id].inventory.count()
         edit_message_in_inline(call, "Вы уже приняли квест", keyboard_sewer)
 
 

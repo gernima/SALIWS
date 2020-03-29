@@ -1,2 +1,2 @@
-a = {1: 2, 2: [1]}
-print(list(a.keys()))
+a = [1, 2, 1, 1]
+print(a.count(1))
