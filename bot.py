@@ -425,30 +425,34 @@ class Logic:
                 self.send_map(keyboard_move)
                 bot.register_next_step_handler(message, self.hero_move)
         elif obj == '👩🏼‍🏫':
-            if self.map == 'library':
+            if self.map == 'library_town':
                 bot.send_message(self.id, 'Вы начали разговор с библиотекарем', reply_markup=keyboard_librarian)
                 bot.register_next_step_handler(message, self.hero_move)
         elif obj == '👰🏼':
-            if self.map == 'sewing':
+            if self.map == 'sewing_town':
                 write_class(self.id, self)
                 bot.send_message(self.id, 'Вы начали разговор со швеей', reply_markup=keyboard_sewer)
                 bot.register_next_step_handler(message, self.hero_move)
         elif obj == '📚':
             if self.map == 'town':
-                self.load_map_move('library', x=5, y=9)
+                self.load_map_move('library_town', x=5, y=9)
                 bot.register_next_step_handler(message, self.hero_move)
         elif obj == '🧵':
             if self.map == 'town':
-                self.load_map_move('sewing', x=5, y=1)
+                self.load_map_move('sewing_town', x=5, y=1)
+                bot.register_next_step_handler(message, self.hero_move)
+        elif obj == '⚔':
+            if self.map == 'town':
+                self.load_map_move('arena_town', x=5, y=1)
                 bot.register_next_step_handler(message, self.hero_move)
         elif obj == '🚪':
             if self.map == 'town':
                 self.load_map_move('level1', x=1, y=1)
             elif self.map == 'level1':
                 self.load_map_move('town', x=5, y=1)
-            elif self.map == 'library':
+            elif self.map == 'library_town':
                 self.load_map_move('town', x=6, y=2)
-            elif self.map == 'sewing':
+            elif self.map == 'sewing_town':
                 self.load_map_move('town', x=4, y=2)
             bot.register_next_step_handler(message, self.hero_move)
         else:
@@ -894,6 +898,7 @@ sewing
 end.
 """
 classes = {}
+arena_queue = []
 print('start')
 add_spell = ''
 add_skin = ''
@@ -1239,4 +1244,5 @@ def send_text(message):
         print(e)
 
 
-bot.polling()
+while True:
+    bot.polling()
