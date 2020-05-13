@@ -36,6 +36,16 @@ def choice_mode(call):
                               reply_markup=get_move_keyboard())
 
 
+@bot.callback_query_handler(func=lambda call: 'librarian' in call.data.split('_')[0])
+def librarian(call):
+    dialogs.librarian(call, bot, saves)
+
+
+@bot.callback_query_handler(func=lambda call: 'sewer' in call.data.split('_')[0])
+def sewer(call):
+    dialogs.sewer(call, bot, saves)
+
+
 @bot.callback_query_handler(func=lambda call: 'move' in call.data.split('_')[0])
 def move(call):
     if 'up' in call.data or 'down' in call.data or 'left' in call.data or 'right' in call.data:
