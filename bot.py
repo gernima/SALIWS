@@ -71,7 +71,7 @@ def check_teleportation(cell, call):
     elif this_map == 'arena_town':
         if cell == '🚪':
             new_map = 'town'
-    elif this_map == 'sewering_town':
+    elif this_map == 'sewing_town':
         if cell == '🚪':
             new_map = 'town'
     elif this_map == 'library_town':
