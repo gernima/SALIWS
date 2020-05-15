@@ -5,7 +5,9 @@ from os import environ
 import sqlite3
 from char import *
 from keyboards import *
+from fight import *
 from pickle import load
+from enemies import *
 import dialogs
 
 
@@ -16,8 +18,6 @@ load_dotenv()
 token = environ['dev_token']
 bot = telebot.TeleBot(token)
 print('start')
-con = sqlite3.connect("saves.db", check_same_thread=False)
-cur = con.cursor()
 saves = {'example': {'name': '', 'gold': 0, 'lvl': 1, 'pos': {'map': 'town', 'x': 5, 'y': 4}, 'inventory': {}, 'skin': '😀',
                      'need_xp': 0, 'xp': 0, 'spells': [], 'quests': [], 'inventory_max_n': 0, 'hp': 0, 'mp': 0,
                      'equip_items': {'head': '', 'body': '', 'pants': '', 'boots': ''},
@@ -49,51 +49,26 @@ def sewer(call):
 @bot.callback_query_handler(func=lambda call: 'move' in call.data.split('_')[0])
 def move(call):
     if 'up' in call.data or 'down' in call.data or 'left' in call.data or 'right' in call.data:
+        y = saves[call.from_user.id]['pos']['y']
+        x = saves[call.from_user.id]['pos']['x']
+        prev_map_str = load_map(call.from_user.id)
         if 'up' in call.data:
-            if saves[call.from_user.id]['pos']['y'] - 1 == '🌫':
-                saves[call.from_user.id]['pos']['y'] -= 1
+            # if get_map_list(call.from_user.id)[saves[call.from_user.id]['pos']['y'] - 1][saves[call.from_user.id]['pos']['x']] == '🌫':
+            y -= 1
         elif 'down' in call.data:
-            if saves[call.from_user.id]['pos']['y'] + 1 == '🌫':
-                saves[call.from_user.id]['pos']['y'] += 1
+            # if get_map_list(call.from_user.id)[saves[call.from_user.id]['pos']['y'] + 1][saves[call.from_user.id]['pos']['x']] == '🌫':
+            y += 1
         elif 'left' in call.data:
-            if saves[call.from_user.id]['pos']['x'] - 1 == '🌫':
-                saves[call.from_user.id]['pos']['x'] -= 1
+            # if get_map_list(call.from_user.id)[saves[call.from_user.id]['pos']['y']][saves[call.from_user.id]['pos']['x'] - 1] == '🌫':
+            x -= 1
         elif 'right' in call.data:
-            if saves[call.from_user.id]['pos']['x'] + 1 == '🌫':
-                saves[call.from_user.id]['pos']['x'] += 1
-        check_teleportation(get_map_list(call.from_user.id)[saves[call.from_user.id]['pos']['y']][saves[call.from_user.id]['pos']['x']], call)
-        bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
-                              text=load_map(call.from_user.id),
-                              reply_markup=get_move_keyboard())
-
-
-def check_teleportation(cell, call):
-    this_map = saves[call.from_user.id]['pos']['map']
-    if this_map == 'town':
-        if cell == '🚪':
-            new_map = 'level1'
-        elif cell == '🧵':
-            new_map = 'sewer_town'
-        elif cell == '📚':
-            new_map = 'library_town'
-        elif cell == '⚔':
-            new_map = 'arena_town'
-    elif this_map == 'arena_town':
-        if cell == '🚪':
-            new_map = 'town'
-    elif this_map == 'sewing_town':
-        if cell == '🚪':
-            new_map = 'town'
-    elif this_map == 'library_town':
-        if cell == '🚪':
-            new_map = 'town'
-        elif cell == '👩🏼‍🏫':
-            bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
-                                  text='Хм?', reply_markup=get_librarian_keyboard())
-    try:
-        saves[call.from_user.id]['pos']['map'] = new_map
-    except:
-        pass
+            # if get_map_list(call.from_user.id)[saves[call.from_user.id]['pos']['y']][saves[call.from_user.id]['pos']['x'] + 1] == '🌫':
+            x += 1
+        if not check_cell(call, x, y):
+            if prev_map_str != load_map(call.from_user.id):
+                bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
+                                      text=load_map(call.from_user.id),
+                                      reply_markup=get_move_keyboard())
 
 
 def get_map_list(chat_id):
@@ -105,6 +80,55 @@ def get_map_list(chat_id):
 
 def load_map(chat_id):
     return '\n'.join(''.join(x) for x in get_map_list(chat_id))
+
+
+def check_cell(call, x, y):
+    this_map = saves[call.from_user.id]['pos']['map']
+    new_map = saves[call.from_user.id]['pos']['map']
+    cell = get_map_list(call.from_user.id)[y][x]
+    if cell in ENEMIES['skins']:
+        pass
+    else:
+        if this_map == 'town':
+            if cell == '🚪':
+                new_map = 'level1'
+                y = 1
+                x = 1
+            elif cell == '🧵':
+                new_map = 'sewing_town'
+                y = 1
+                x = 5
+            elif cell == '📚':
+                new_map = 'library_town'
+                y = 9
+                x = 5
+            elif cell == '⚔':
+                new_map = 'arena_town'
+                y = 1
+                x = 5
+        elif this_map == 'arena_town':
+            if cell == '🚪':
+                new_map = 'town'
+                y = 4
+                x = 5
+        elif this_map == 'sewing_town':
+            if cell == '🚪':
+                new_map = 'town'
+                y = 2
+                x = 4
+        elif this_map == 'library_town':
+            if cell == '🚪':
+                new_map = 'town'
+                y = 2
+                x = 6
+            elif cell == '👩🏼‍🏫':
+                bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
+                                      text='Хм?', reply_markup=get_librarian_keyboard())
+                return True
+    saves[call.from_user.id]['pos']['y'] = y
+    saves[call.from_user.id]['pos']['x'] = x
+    saves[call.from_user.id]['pos']['map'] = new_map
+    return False
 
 
 def save_to_db(chat_id, name=''):
@@ -168,6 +192,12 @@ def commands(message):
         bot.send_message(message.chat.id, 'Выберите режим игры', reply_markup=choice_mode_keyboard)
     elif message.text == '/help':
         bot.send_message(message.chat.id, 'Помощь? Я мало с чем могу помочь. Ты в башне, она разделена на множество этажей, в каждый этаж универсален. Вокруг башни мы построили город, в нем есть много всего. Возвращаться каждый в город не удобно, так что мы смогли некоторые этажи превратить в мини-города. Вроде как все! Ах да, после 5 этажа, башня каждый раз генерируется случайной, так что надейся на удачу.', reply_markup=choice_mode_keyboard)
+
+
+chat_ids = [int(x[0]) for x in cur.execute("""Select chat_id from users""").fetchall()]
+if chat_ids:
+    for i in chat_ids:
+        get_data_from_db(i)
 
 
 try:

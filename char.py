@@ -1,3 +1,6 @@
+BASIC_CHARS = {'dodge': 5}
+
+
 def get_damage_from_strength(strength):
     return strength * 0.5
 
