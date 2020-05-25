@@ -1,36 +1,83 @@
 import telebot
-import sqlite3
 from dotenv import load_dotenv
 from os import environ
-import sqlite3
 from char import *
-from keyboards import *
+# from keyboards import *
 from fight import *
 from pickle import load
 from enemies import *
 import dialogs
+from base_var_and_func import *
 
 
 load_dotenv()
 # if str(input('1 is main, another dev: ')) == '1':
 #     token = environ['main_token']
 # else:
+CHARACTERISTICS = {'strength', 'agility', 'intelligence', 'lucky', 'wisdom', 'stamina'}
 token = environ['dev_token']
 bot = telebot.TeleBot(token)
 print('start')
-saves = {'example': {'name': '', 'gold': 0, 'lvl': 1, 'pos': {'map': 'town', 'x': 5, 'y': 4}, 'inventory': {}, 'skin': '😀',
-                     'need_xp': 0, 'xp': 0, 'spells': [], 'quests': [], 'inventory_max_n': 0, 'hp': 0, 'mp': 0,
-                     'equip_items': {'head': '', 'body': '', 'pants': '', 'boots': ''},
-                     'fight': {'damage': 0, 'block': 0, 'dodge': 0, 'chance_of_loot': 0, 'hp_regen': 0, 'mp_regen': 0, 'crit': 0},
-                     'char': {'strength': 1, 'agility': 1, 'lucky': 1, 'intelligence': 1, 'wisdom': 1, 'stamina': 1, 'free_char': 5}
-                     }
-         }
+
+
+@bot.callback_query_handler(func=lambda call: 'char_' in call.data)
+def char_update(call):
+    if call.data.split('_')[1] in CHARACTERISTICS:
+        if saves[call.from_user.id]['char']['free_char'] > 0:
+            if call.data.split('_')[1] == 'strength':
+                bot.answer_callback_query(callback_query_id=call.id, text='+1 очко силы')
+                saves[call.from_user.id]['char']['strength'] += 1
+                saves[call.from_user.id]['char']['free_char'] -= 1
+            elif call.data.split('_')[1] == 'agility':
+                bot.answer_callback_query(callback_query_id=call.id, text='+1 очко ловкости')
+                saves[call.from_user.id]['char']['agility'] += 1
+                saves[call.from_user.id]['char']['free_char'] -= 1
+            elif call.data.split('_')[1] == 'intelligence':
+                bot.answer_callback_query(callback_query_id=call.id, text='+1 очко интеллекта')
+                saves[call.from_user.id]['char']['intelligence'] += 1
+                saves[call.from_user.id]['char']['free_char'] -= 1
+            elif call.data.split('_')[1] == 'lucky':
+                bot.answer_callback_query(callback_query_id=call.id, text='+1 очко удачи')
+                saves[call.from_user.id]['char']['lucky'] += 1
+                saves[call.from_user.id]['char']['free_char'] -= 1
+            elif call.data.split('_')[1] == 'wisdom':
+                bot.answer_callback_query(callback_query_id=call.id, text='+1 очко мудрости')
+                saves[call.from_user.id]['char']['wisdom'] += 1
+                saves[call.from_user.id]['char']['free_char'] -= 1
+            elif call.data.split('_')[1] == 'stamina':
+                bot.answer_callback_query(callback_query_id=call.id, text='+1 очко выносливости')
+                saves[call.from_user.id]['char']['stamina'] += 1
+                saves[call.from_user.id]['char']['free_char'] -= 1
+            update_char(call.from_user.id)
+            send_hero_char(call, bot)
+        else:
+            bot.answer_callback_query(callback_query_id=call.id,
+                                      text='У вас нет очков характеристик, повысьте ваш уровень')
+    elif call.data == 'char_return':
+        send_map(call, bot)
+        save_to_db(call.from_user.id)
+
+
+@bot.callback_query_handler(func=lambda call: 'drop_from_enemy_' in call.data)
+def drop_from_enemy(call):
+    drop_from_enemy_checker(call, bot)
+
+
+@bot.callback_query_handler(func=lambda call: 'spell' in call.data.split('_')[0])
+def spell(call):
+    fight_spells_checker(call, bot)
+
+
+@bot.callback_query_handler(func=lambda call: 'fight' in call.data.split('_')[0])
+def fight(call):
+    fight_checker(call, bot)
 
 
 @bot.callback_query_handler(func=lambda call: 'mode' in call.data.split('_')[0])
 def choice_mode(call):
     if call.data == 'mode_single':
         get_data_from_db(call.from_user.id, name=call.from_user.username)
+        clear_fight_logs(call.from_user.id)
         bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
                               text=load_map(call.from_user.id),
                               reply_markup=get_move_keyboard())
@@ -46,6 +93,30 @@ def sewer(call):
     dialogs.sewer(call, bot, saves)
 
 
+@bot.callback_query_handler(func=lambda call: 'inventory' in call.data.split('_')[0])
+def inventory(call):
+    if call.data == 'inventory_return':
+        if len(saves[call.from_user.id]['buffer']['enemies']) != 0:
+            send_fight_text(call, bot)
+        else:
+            send_map(call, bot)
+    elif 'page' in call.data:
+        if call.data == 'inventory_next_page':
+            if len(saves[call.from_user.id]['inventory']) > (saves[call.from_user.id]['buffer']['inventory_page'] + 1) * saves[call.from_user.id]['buffer']['inventory_slice']:
+                saves[call.from_user.id]['buffer']['inventory_page'] += 1
+        elif call.data == 'inventory_prev_page':
+            if saves[call.from_user.id]['buffer']['inventory_page'] - 1 >= 0:
+                saves[call.from_user.id]['buffer']['inventory_page'] -= 1
+        send_inventory(call, bot)
+    elif 'item' in call.data:
+        item = call.data.split('_')[2]
+        info = cur.execute("""Select des, used from items where name = ?""", (item, )).fetchall()
+        des, used = info[0][0], info[0][1]
+        bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
+                              text=f'Название: {item}\n\nОписание:{des}',
+                              reply_markup=get_inventory_item_keyboard(call, used))
+
+
 @bot.callback_query_handler(func=lambda call: 'move' in call.data.split('_')[0])
 def move(call):
     if 'up' in call.data or 'down' in call.data or 'left' in call.data or 'right' in call.data:
@@ -53,43 +124,40 @@ def move(call):
         x = saves[call.from_user.id]['pos']['x']
         prev_map_str = load_map(call.from_user.id)
         if 'up' in call.data:
-            # if get_map_list(call.from_user.id)[saves[call.from_user.id]['pos']['y'] - 1][saves[call.from_user.id]['pos']['x']] == '🌫':
             y -= 1
         elif 'down' in call.data:
-            # if get_map_list(call.from_user.id)[saves[call.from_user.id]['pos']['y'] + 1][saves[call.from_user.id]['pos']['x']] == '🌫':
             y += 1
         elif 'left' in call.data:
-            # if get_map_list(call.from_user.id)[saves[call.from_user.id]['pos']['y']][saves[call.from_user.id]['pos']['x'] - 1] == '🌫':
             x -= 1
         elif 'right' in call.data:
-            # if get_map_list(call.from_user.id)[saves[call.from_user.id]['pos']['y']][saves[call.from_user.id]['pos']['x'] + 1] == '🌫':
             x += 1
         if not check_cell(call, x, y):
             if prev_map_str != load_map(call.from_user.id):
-                bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
-                                      text=load_map(call.from_user.id),
-                                      reply_markup=get_move_keyboard())
-
-
-def get_map_list(chat_id):
-    with open(f'levels/{saves[chat_id]["pos"]["map"]}.txt', 'rb') as f:
-        map_list = load(f)
-        map_list[saves[chat_id]["pos"]['y']][saves[chat_id]["pos"]['x']] = saves[chat_id]["skin"]
-        return map_list
-
-
-def load_map(chat_id):
-    return '\n'.join(''.join(x) for x in get_map_list(chat_id))
+                send_map(call, bot)
+    elif call.data == 'move_chars':
+        send_hero_char(call, bot)
+    elif call.data == 'move_inventory':
+        send_inventory(call, bot)
 
 
 def check_cell(call, x, y):
     this_map = saves[call.from_user.id]['pos']['map']
     new_map = saves[call.from_user.id]['pos']['map']
     cell = get_map_list(call.from_user.id)[y][x]
-    if cell in ENEMIES['skins']:
-        pass
+    if cell[0] in ENEMIES['skins']:
+        if cell[0] == '🕷':
+            text = 'Начат бой против: '
+            saves[call.from_user.id]['buffer']['enemies'].append(
+                Spider(name='Обычный Паук', enhancement_n=0, x=x, y=y, bot=bot))
+            for i in saves[call.from_user.id]['buffer']['enemies']:
+                text += f'{i.name} {i.hp}♥ {i.mp}💙 '
+            saves[call.from_user.id]['buffer']['fight_text']['text'] += text
+            bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
+                                  text=text,
+                                  reply_markup=get_fight_keyboard())
+        return True
     else:
-        if this_map == 'town':
+        if this_map == 'town_Bram':
             if cell == '🚪':
                 new_map = 'level1'
                 y = 1
@@ -106,17 +174,17 @@ def check_cell(call, x, y):
                 new_map = 'arena_town'
                 y = 1
                 x = 5
-        elif this_map == 'arena_town':
+        elif this_map == 'town_Bram_arena':
             if cell == '🚪':
                 new_map = 'town'
                 y = 4
                 x = 5
-        elif this_map == 'sewing_town':
+        elif this_map == 'town_Bram_sewing':
             if cell == '🚪':
                 new_map = 'town'
                 y = 2
                 x = 4
-        elif this_map == 'library_town':
+        elif this_map == 'town_Bram_library':
             if cell == '🚪':
                 new_map = 'town'
                 y = 2
@@ -125,65 +193,17 @@ def check_cell(call, x, y):
                 bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
                                       text='Хм?', reply_markup=get_librarian_keyboard())
                 return True
-    saves[call.from_user.id]['pos']['y'] = y
-    saves[call.from_user.id]['pos']['x'] = x
-    saves[call.from_user.id]['pos']['map'] = new_map
+        elif this_map == 'level1':
+            if cell == '🚪':
+                new_map = 'town'
+                y = 2
+                x = 5
+        saves[call.from_user.id]['pos']['y'] = y
+        saves[call.from_user.id]['pos']['x'] = x
+        saves[call.from_user.id]['pos']['map'] = new_map
+        if cell == '🚪':
+            save_to_db(call.from_user.id)
     return False
-
-
-def save_to_db(chat_id, name=''):
-    if chat_id in [int(x[0]) for x in cur.execute("""Select chat_id from users""").fetchall()]:
-        inventory = ';'.join([f'{x}:{saves[chat_id]["inventory"][x]}' for x in saves[chat_id]['inventory'].keys()])
-        pos = ';'.join([f'{x}:{saves[chat_id]["pos"][x]}' for x in saves[chat_id]['pos'].keys()])
-        equip_items = ';'.join(
-            [f'{x}:{saves[chat_id]["equip_items"][x]}' for x in saves[chat_id]['equip_items'].keys()])
-        fight = ';'.join([f'{x}:{saves[chat_id]["fight"][x]}' for x in saves[chat_id]['fight'].keys()])
-        char = ';'.join([f'{x}:{saves[chat_id]["char"][x]}' for x in saves[chat_id]['char'].keys()])
-        q = f"""UPDATE users SET chat_id = {chat_id}, name = {saves[chat_id]['name']}, gold = {saves[chat_id]['gold']}, 
-                lvl = {saves[chat_id]['lvl']}, pos = {pos}, inventory = {inventory}, skin = {saves[chat_id]['skin']}, 
-                xp = {saves[chat_id]['xp']}, need_xp = {saves[chat_id]['need_xp']}, spells = {';'.join(saves[chat_id]['spells'])}, 
-                quests = {';'.join(saves[chat_id]['quests'])}, inventory_max_n = {saves[chat_id]['inventoru_max_n']}, 
-                hp = {saves[chat_id]['hp']}, mp = {saves[chat_id]['mp']}, equip_items = {equip_items}, fight = {fight}, 
-                char = {char} WHERE chat_id = {chat_id}"""
-        cur.execute(q)
-    else:
-        saves[chat_id] = saves['example']
-        saves[chat_id]['name'] = name
-        inventory = ';'.join([f'{x}:{saves[chat_id]["inventory"][x]}' for x in saves[chat_id]['inventory'].keys()])
-        pos = ';'.join([f'{x}:{saves[chat_id]["pos"][x]}' for x in saves[chat_id]['pos'].keys()])
-        equip_items = ';'.join(
-            [f'{x}:{saves[chat_id]["equip_items"][x]}' for x in saves[chat_id]['equip_items'].keys()])
-        fight = ';'.join([f'{x}:{saves[chat_id]["fight"][x]}' for x in saves[chat_id]['fight'].keys()])
-        char = ';'.join([f'{x}:{saves[chat_id]["char"][x]}' for x in saves[chat_id]['char'].keys()])
-        q = f"""Insert into users Values({('?,'*17)[:-1]})"""
-        cur.execute(q, (chat_id, saves[chat_id]['name'], saves[chat_id]['gold'],
-                    saves[chat_id]['lvl'], pos, inventory, saves[chat_id]['skin'],
-                    saves[chat_id]['xp'], saves[chat_id]['need_xp'], ';'.join(saves[chat_id]['spells']),
-                    ';'.join(saves[chat_id]['quests']), saves[chat_id]['inventory_max_n'],
-                    saves[chat_id]['hp'], saves[chat_id]['mp'], equip_items, fight, char))
-    con.commit()
-
-
-def get_data_from_db(chat_id, name=''):
-    saves[chat_id] = saves['example']
-    if chat_id not in [int(x[0]) for x in cur.execute("""Select chat_id from users""").fetchall()]:
-        save_to_db(chat_id, name)
-    else:
-        tables = ['name', 'gold', 'lvl', 'skin', 'xp', 'need_xp', 'spells', 'quests', 'inventory_max_n', 'hp', 'mp']
-        dict_tables = ['pos', 'inventory', 'equip_items', 'fight', 'char']
-        for table in tables:
-            saves[chat_id][table] = cur.execute(f"""Select {table} from users where {chat_id}""").fetchone()[0]
-        for table in dict_tables:
-            z = {}
-            b = cur.execute(f"""Select {table} from users where chat_id = {chat_id}""").fetchone()[0].split(';')
-            if len(b) > 0 and b[0] != '':
-                for i in [x.split(':') for x in b]:
-                    if i[1].isdigit():
-                        z[i[0]] = int(i[1])
-                    else:
-                        z[i[0]] = i[1]
-                saves[chat_id][table] = z
-        con.commit()
 
 
 @bot.message_handler(commands=['start', 'help'])
@@ -200,7 +220,7 @@ if chat_ids:
         get_data_from_db(i)
 
 
-try:
-    bot.polling(none_stop=True, interval=0)
-except Exception as e:
-    print(f'bot.polling {e}')
+# try:
+bot.polling(none_stop=True, interval=0)
+# except Exception as e:
+#     print(f'bot.polling {e}')
