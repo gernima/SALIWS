@@ -143,6 +143,22 @@ def get_spells_keyboard(call):
     return keyboard
 
 
+def get_sewer_skins_shop_keyboard(call):
+    keyboard = telebot.types.InlineKeyboardMarkup(row_width=5)
+    keyboard.add(telebot.types.InlineKeyboardButton(text='Назад', callback_data="sewer_skins_shop_return"))
+    a = []
+    n = 0
+    for skin, cost in SEWER_SKINS_SHOP.items():
+        if skin != saves[call.from_user.id]['skin']:
+            n += 1
+            a.append(telebot.types.InlineKeyboardButton(text=f'{skin} | {cost}', callback_data=f"sewer_skins_shop_{skin}"))
+        if n == 5:
+            keyboard.add(a[0], a[1], a[2], a[3], a[4])
+            a = []
+            n = 0
+    return keyboard
+
+
 def get_keyboard_enemies_fight(call):
     keyboard = types.InlineKeyboardMarkup()
     # splited_data = len(get_map_list(call.from_user.id)[saves[call.from_user.id]['pos']['y']][saves[call.from_user.id]['pos']['x']].split(':'))
@@ -156,17 +172,10 @@ def get_keyboard_enemies_fight(call):
     return keyboard
 
 
-# def get_inventory_keyboard(call):
-#     keyboard = types.InlineKeyboardMarkup()
-#     for item in saves[call.from_user.id]["inventory"].keys():
-#         keyboard.add(types.InlineKeyboardButton(text=item, callback_data=f"inventory_item_{item}"))
-#     return keyboard
-
-
-def get_librarian_spells_shop_keyboard(spell):
+def get_librarian_spells_shop_item_keyboard(spell):
     keyboard = types.InlineKeyboardMarkup()
-    keyboard.add(types.InlineKeyboardButton(text="Да", callback_data=f"librarian_{spell}_spells_shop_yes"),
-                 types.InlineKeyboardButton(text="Нет", callback_data=f"librarian_{spell}_spells_shop_no"))
+    keyboard.add(types.InlineKeyboardButton(text="Да", callback_data=f"librarian_spells_shop_yes_{spell}"),
+                 types.InlineKeyboardButton(text="Нет", callback_data=f"librarian_spells_shop_no_{spell}"))
     return keyboard
 
 
@@ -181,8 +190,8 @@ def get_sewer_keyboard():
 
 def get_sewer_skins_shop_yes_or_no_keyboard(skin):
     keyboard = types.InlineKeyboardMarkup()
-    keyboard.add(types.InlineKeyboardButton(text="Да", callback_data=f"sewer_{skin}_skins_shop_yes"),
-                 types.InlineKeyboardButton(text="Нет", callback_data=f"sewer_{skin}_skins_shop_no"))
+    keyboard.add(types.InlineKeyboardButton(text="Да", callback_data=f"sewer_skins_shop_yes_{skin}"),
+                 types.InlineKeyboardButton(text="Нет", callback_data=f"sewer_skins_shop_no_{skin}"))
     return keyboard
 
 

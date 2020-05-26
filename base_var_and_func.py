@@ -106,6 +106,8 @@ def get_data_from_db(chat_id, name=''):
 
 con = connect("saves.db", check_same_thread=False)
 cur = con.cursor()
+SEWER_SKINS_SHOP = {'🤡': 100, '😒': 100, '😡': 100, '🤓': 100, '😀': 100, '😈': 100,
+                    '💩': 100, '👻': 100, '👺': 100, '👹': 100, '👿': 100, '💀': 100}
 saves = {'example': {'name': '', 'gold': 0, 'lvl': 1, 'pos': {'map': 'town_Bram', 'x': 5, 'y': 4}, 'inventory': {}, 'skin': '😀',
                      'need_xp': 0, 'xp': 0, 'spells': [], 'quests': [], 'inventory_max_n': 3,
                      'buffer': {'enemies': [], 'drop_items': [], 'inventory_page': 0, 'inventory_slice': 20, 'fight_text': {'text': '', 'keyboard': ''}},

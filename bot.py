@@ -20,6 +20,11 @@ bot = telebot.TeleBot(token)
 print('start')
 
 
+@bot.callback_query_handler(func=lambda call: 'sewer_skins_shop_yes' in call.data or 'sewer_skins_shop_no' in call.data)
+def yes_or_no_skins(call):
+    dialogs.yes_or_no_skins(call, bot)
+
+
 @bot.callback_query_handler(func=lambda call: 'char_' in call.data)
 def char_update(call):
     if call.data.split('_')[1] in CHARACTERISTICS:
@@ -85,12 +90,12 @@ def choice_mode(call):
 
 @bot.callback_query_handler(func=lambda call: 'librarian' in call.data.split('_')[0])
 def librarian(call):
-    dialogs.librarian(call, bot, saves)
+    dialogs.librarian(call, bot)
 
 
 @bot.callback_query_handler(func=lambda call: 'sewer' in call.data.split('_')[0])
 def sewer(call):
-    dialogs.sewer(call, bot, saves)
+    dialogs.sewer(call, bot)
 
 
 @bot.callback_query_handler(func=lambda call: 'inventory' in call.data.split('_')[0])
@@ -163,30 +168,30 @@ def check_cell(call, x, y):
                 y = 1
                 x = 1
             elif cell == '🧵':
-                new_map = 'sewing_town'
+                new_map = 'town_Bram_sewing'
                 y = 1
                 x = 5
             elif cell == '📚':
-                new_map = 'library_town'
+                new_map = 'town_Bram_library'
                 y = 9
                 x = 5
             elif cell == '⚔':
-                new_map = 'arena_town'
+                new_map = 'town_Bram_arena'
                 y = 1
                 x = 5
         elif this_map == 'town_Bram_arena':
             if cell == '🚪':
-                new_map = 'town'
+                new_map = 'town_Bram'
                 y = 4
                 x = 5
         elif this_map == 'town_Bram_sewing':
             if cell == '🚪':
-                new_map = 'town'
+                new_map = 'town_Bram'
                 y = 2
                 x = 4
         elif this_map == 'town_Bram_library':
             if cell == '🚪':
-                new_map = 'town'
+                new_map = 'town_Bram'
                 y = 2
                 x = 6
             elif cell == '👩🏼‍🏫':
@@ -195,7 +200,7 @@ def check_cell(call, x, y):
                 return True
         elif this_map == 'level1':
             if cell == '🚪':
-                new_map = 'town'
+                new_map = 'town_Bram'
                 y = 2
                 x = 5
         saves[call.from_user.id]['pos']['y'] = y
