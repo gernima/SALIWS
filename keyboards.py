@@ -2,6 +2,7 @@ from telebot import types
 from fight import *
 from base_var_and_func import *
 from pickle import load
+from time import time
 
 choice_mode_keyboard = types.InlineKeyboardMarkup()  # перед началом игры, после /start
 choice_mode_keyboard.add(types.InlineKeyboardButton('Одиночная игра', callback_data='mode_single'))
@@ -9,14 +10,22 @@ choice_mode_keyboard.add(types.InlineKeyboardButton('Одиночная игра
 
 
 def send_hero_char(call, bot):
-    bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
-                          text=f"Ник: {saves[call.from_user.id]['name']}\n"
+    try:
+        bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
+                              text=f"Ник: {saves[call.from_user.id]['name']}\n"
+                                   f"Опыт: {saves[call.from_user.id]['xp']}/{saves[call.from_user.id]['need_xp']}\n"
+                                   f"Способности: ({', '.join(saves[call.from_user.id]['spells'])})\n"
+                                   f"Скин: {saves[call.from_user.id]['skin']}\n"
+                                   f"Квесты: ({', '.join(saves[call.from_user.id]['quests'])})\n"
+                                   f"Прокачка характеристик:",
+                              reply_markup=get_keyboard_characteristic(call))
+    except:
+        print('char too long', f"Ник: {saves[call.from_user.id]['name']}\n"
                                f"Опыт: {saves[call.from_user.id]['xp']}/{saves[call.from_user.id]['need_xp']}\n"
                                f"Способности: ({', '.join(saves[call.from_user.id]['spells'])})\n"
                                f"Скин: {saves[call.from_user.id]['skin']}\n"
-                               f"Квесты: ({', '.join(saves[call.from_user.id]['spells'])})\n"
-                               f"Прокачка характеристик:",
-                          reply_markup=get_keyboard_characteristic(call))
+                               f"Квесты: ({', '.join(saves[call.from_user.id]['quests'])})\n"
+                               f"Прокачка характеристик:")
 
 
 def get_map_list(chat_id):
@@ -144,14 +153,14 @@ def get_spells_keyboard(call):
 
 
 def get_sewer_skins_shop_keyboard(call):
-    keyboard = telebot.types.InlineKeyboardMarkup(row_width=5)
-    keyboard.add(telebot.types.InlineKeyboardButton(text='Назад', callback_data="sewer_skins_shop_return"))
+    keyboard = types.InlineKeyboardMarkup(row_width=5)
+    keyboard.add(types.InlineKeyboardButton(text='Назад', callback_data="sewer_skins_shop_return"))
     a = []
     n = 0
-    for skin, cost in SEWER_SKINS_SHOP.items():
+    for skin, cost in SKINS_SHOP['_'.join(saves[call.from_user.id]['pos']['map'].split('_')[:2])].items():
         if skin != saves[call.from_user.id]['skin']:
             n += 1
-            a.append(telebot.types.InlineKeyboardButton(text=f'{skin} | {cost}', callback_data=f"sewer_skins_shop_{skin}"))
+            a.append(types.InlineKeyboardButton(text=f'{skin} | {cost}', callback_data=f"sewer_skins_shop_{skin}"))
         if n == 5:
             keyboard.add(a[0], a[1], a[2], a[3], a[4])
             a = []
@@ -174,31 +183,62 @@ def get_keyboard_enemies_fight(call):
 
 def get_librarian_spells_shop_item_keyboard(spell):
     keyboard = types.InlineKeyboardMarkup()
-    keyboard.add(types.InlineKeyboardButton(text="Да", callback_data=f"librarian_spells_shop_yes_{spell}"),
-                 types.InlineKeyboardButton(text="Нет", callback_data=f"librarian_spells_shop_no_{spell}"))
+    keyboard.add(types.InlineKeyboardButton(text="Да", callback_data=f"librarian_spells_shop_{spell}_yes"),
+                 types.InlineKeyboardButton(text="Нет", callback_data=f"librarian_spells_shop_{spell}_no"))
     return keyboard
 
 
-def get_sewer_keyboard():
+def get_librarian_spells_shop_keyboard(call):
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton(text='Назад', callback_data="librarian_spells_shop_return"))
+    new_spells = list(SPELLS_SHOP['_'.join(saves[call.from_user.id]['pos']['map'].split('_')[:2])].keys())
+    for spell in saves[call.from_user.id]['spells']:
+        if spell in new_spells:
+            new_spells.remove(spell)
+    for spell in new_spells:
+        keyboard.add(types.InlineKeyboardButton(text=spell, callback_data=f"librarian_spells_shop_{spell}"))
+    return keyboard
+
+
+def show_quest(chat_id, name):
+    if name in saves[chat_id]['quests'].keys():
+        for quest in saves[chat_id]['quests'].keys():
+            a = cur.execute(f"""Select time, need_lvl, need_items from quests where name = '{quest}'""").fetchall()
+            tf = True
+            for item in a[2]:
+                if item in saves[chat_id]['inventory'] and tf:
+                    tf = True
+                elif tf:
+                    tf = False
+                    break
+            if saves[chat_id]['quests'][quest]['completed'] or (a[1] <= saves[chat_id]['lvl'] and tf):
+                return True
+            if time() - saves[chat_id]['quests'][quest]['time'] < a[0]:
+                return False
+    return True
+
+
+def get_sewer_keyboard(call):
     keyboard = types.InlineKeyboardMarkup()
     keyboard.add(types.InlineKeyboardButton(text="Здравствуйте", callback_data=f"sewer_talk_hi"))
     keyboard.add(types.InlineKeyboardButton(text="Магазин скинов", callback_data=f"sewer_skins_shop"))
-    keyboard.add(types.InlineKeyboardButton(text="Сбор паутины", callback_data=f"sewer_quest_spider_web"))
+    if show_quest(call.from_user.id, 'sewer'):
+        keyboard.add(types.InlineKeyboardButton(text="Сбор паутины", callback_data=f"sewer_quest_Сбор паутины для швеи"))
     keyboard.add(types.InlineKeyboardButton(text="До свидания", callback_data=f"sewer_talk_bye"))
     return keyboard
 
 
 def get_sewer_skins_shop_yes_or_no_keyboard(skin):
     keyboard = types.InlineKeyboardMarkup()
-    keyboard.add(types.InlineKeyboardButton(text="Да", callback_data=f"sewer_skins_shop_yes_{skin}"),
-                 types.InlineKeyboardButton(text="Нет", callback_data=f"sewer_skins_shop_no_{skin}"))
+    keyboard.add(types.InlineKeyboardButton(text="Да", callback_data=f"sewer_skins_shop_{skin}_yes"),
+                 types.InlineKeyboardButton(text="Нет", callback_data=f"sewer_skins_shop_{skin}_no"))
     return keyboard
 
 
 def get_quest_keyboard(quest):
     keyboard = types.InlineKeyboardMarkup()
-    keyboard.add(types.InlineKeyboardButton(text="Да", callback_data=f"quest_{quest}_yes"),
-                 types.InlineKeyboardButton(text="Нет", callback_data=f"quest_{quest}_no"))
+    keyboard.add(types.InlineKeyboardButton(text="Принять", callback_data=f"quest_{quest}_yes"),
+                 types.InlineKeyboardButton(text="Отказаться", callback_data=f"quest_{quest}_no"))
     return keyboard
 
 

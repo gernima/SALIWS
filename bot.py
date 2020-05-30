@@ -14,15 +14,32 @@ load_dotenv()
 # if str(input('1 is main, another dev: ')) == '1':
 #     token = environ['main_token']
 # else:
-CHARACTERISTICS = {'strength', 'agility', 'intelligence', 'lucky', 'wisdom', 'stamina'}
 token = environ['dev_token']
 bot = telebot.TeleBot(token)
 print('start')
 
 
+@bot.callback_query_handler(func=lambda call: 'quest_' in call.data and '_quest_' not in call.data)
+def quest_yes_or_no(call):
+    dialogs.yes_or_no_quest(call, bot)
+
+
 @bot.callback_query_handler(func=lambda call: 'sewer_skins_shop_yes' in call.data or 'sewer_skins_shop_no' in call.data)
 def yes_or_no_skins(call):
-    dialogs.yes_or_no_skins(call, bot)
+    if 'town_Bram' in saves[call.from_user.id]['pos']['map']:
+        dialogs.yes_or_no_skins(call, bot)
+
+
+@bot.callback_query_handler(func=lambda call: 'librarian' in call.data.split('_')[0])
+def librarian(call):
+    if 'town_Bram' in saves[call.from_user.id]['pos']['map']:
+        dialogs.librarian(call, bot)
+
+
+@bot.callback_query_handler(func=lambda call: 'sewer' in call.data.split('_')[0])
+def sewer(call):
+    if 'town_Bram' in saves[call.from_user.id]['pos']['map']:
+        dialogs.sewer(call, bot)
 
 
 @bot.callback_query_handler(func=lambda call: 'char_' in call.data)
@@ -86,16 +103,6 @@ def choice_mode(call):
         bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
                               text=load_map(call.from_user.id),
                               reply_markup=get_move_keyboard())
-
-
-@bot.callback_query_handler(func=lambda call: 'librarian' in call.data.split('_')[0])
-def librarian(call):
-    dialogs.librarian(call, bot)
-
-
-@bot.callback_query_handler(func=lambda call: 'sewer' in call.data.split('_')[0])
-def sewer(call):
-    dialogs.sewer(call, bot)
 
 
 @bot.callback_query_handler(func=lambda call: 'inventory' in call.data.split('_')[0])
@@ -189,6 +196,11 @@ def check_cell(call, x, y):
                 new_map = 'town_Bram'
                 y = 2
                 x = 4
+            elif cell == '👰🏼':
+                bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
+                                      text='Да?', reply_markup=get_sewer_keyboard(call))
+                save_to_db(call.from_user.id)
+                return True
         elif this_map == 'town_Bram_library':
             if cell == '🚪':
                 new_map = 'town_Bram'
@@ -197,6 +209,7 @@ def check_cell(call, x, y):
             elif cell == '👩🏼‍🏫':
                 bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
                                       text='Хм?', reply_markup=get_librarian_keyboard())
+                save_to_db(call.from_user.id)
                 return True
         elif this_map == 'level1':
             if cell == '🚪':
@@ -206,7 +219,7 @@ def check_cell(call, x, y):
         saves[call.from_user.id]['pos']['y'] = y
         saves[call.from_user.id]['pos']['x'] = x
         saves[call.from_user.id]['pos']['map'] = new_map
-        if cell == '🚪':
+        if cell == '🚪' or cell == '🧵' or cell == '📚' or cell == '⚔':
             save_to_db(call.from_user.id)
     return False
 

@@ -57,13 +57,14 @@ def save_to_db(chat_id, name=''):
             [f'{x}:{saves[chat_id]["equip_items"][x]}' for x in saves[chat_id]['equip_items'].keys()])
         fight_db = ';'.join([f'{x}:{saves[chat_id]["fight"][x]}' for x in saves[chat_id]['fight'].keys()])
         char = ';'.join([f'{x}:{saves[chat_id]["char"][x]}' for x in saves[chat_id]['char'].keys()])
+        quests = ';'.join([f'{x}:{saves[chat_id]["quests"][x]}' for x in saves[chat_id]['quests'].keys()])
         cur.execute(f"""UPDATE users SET gold = ?,
                 lvl = ?, pos = ?, inventory = ?, skin = ?, xp = ?, need_xp = ?, spells = ?, 
-                quests = ?, inventory_max_n = ?, equip_items = ?, fight = ?, 
-                char = ? WHERE chat_id = ?""", (saves[chat_id]['gold'], saves[chat_id]['lvl'], pos,
+                quests = ?, inventory_max_n = ?, equip_items = ?, fight = ?, char = ? WHERE chat_id = ?""",
+                    (saves[chat_id]['gold'], saves[chat_id]['lvl'], pos,
                     inventory, saves[chat_id]['skin'],
                 saves[chat_id]['xp'], saves[chat_id]['need_xp'], ';'.join(saves[chat_id]['spells']),
-                ';'.join(saves[chat_id]['quests']), saves[chat_id]['inventory_max_n'], equip_items, fight_db, char, chat_id))
+                quests, saves[chat_id]['inventory_max_n'], equip_items, fight_db, char, chat_id))
     else:
         saves[chat_id] = saves['example']
         update_char(chat_id)
@@ -74,11 +75,12 @@ def save_to_db(chat_id, name=''):
             [f'{x}:{saves[chat_id]["equip_items"][x]}' for x in saves[chat_id]['equip_items'].keys()])
         fight_db = ';'.join([f'{x}:{saves[chat_id]["fight"][x]}' for x in saves[chat_id]['fight'].keys()])
         char = ';'.join([f'{x}:{saves[chat_id]["char"][x]}' for x in saves[chat_id]['char'].keys()])
+        quests = ';'.join([f'{x}:{saves[chat_id]["quests"][x]}' for x in saves[chat_id]['quests'].keys()])
         q = f"""Insert into users Values({('?,'*15)[:-1]})"""
-        cur.execute(q, (chat_id, saves[chat_id]['name'], saves[chat_id]['gold'],
-                    saves[chat_id]['lvl'], pos, inventory, saves[chat_id]['skin'],
-                    saves[chat_id]['xp'], saves[chat_id]['need_xp'], ';'.join(saves[chat_id]['spells']),
-                    ';'.join(saves[chat_id]['quests']), saves[chat_id]['inventory_max_n'], equip_items, fight_db, char))
+        cur.execute(q, (chat_id, saves[chat_id]['name'], saves[chat_id]['gold'], saves[chat_id]['lvl'], pos, inventory,
+                        saves[chat_id]['skin'], saves[chat_id]['xp'], saves[chat_id]['need_xp'],
+                        ';'.join(saves[chat_id]['spells']),
+                    quests, saves[chat_id]['inventory_max_n'], equip_items, fight_db, char))
     con.commit()
 
 
@@ -87,8 +89,14 @@ def get_data_from_db(chat_id, name=''):
     if chat_id not in [int(x[0]) for x in cur.execute("""Select chat_id from users""").fetchall()]:
         save_to_db(chat_id, name)
     else:
-        tables = ['name', 'gold', 'lvl', 'skin', 'xp', 'need_xp', 'spells', 'quests', 'inventory_max_n']
-        dict_tables = ['pos', 'inventory', 'equip_items', 'fight', 'char']
+        tables = ['name', 'gold', 'lvl', 'skin', 'xp', 'need_xp', 'inventory_max_n']
+        dict_tables = ['pos', 'inventory', 'equip_items', 'fight', 'char', 'quests']
+        list_tables = ['spells']
+        for table in list_tables:
+            b = cur.execute(f"""Select {table} from users where chat_id = {chat_id}""").fetchone()[0].split(';')
+            if len(b) > 0 and b[0] != '':
+                for i in b:
+                    saves[chat_id][table].append(i)
         for table in tables:
             saves[chat_id][table] = cur.execute(f"""Select {table} from users where {chat_id}""").fetchone()[0]
         for table in dict_tables:
@@ -106,15 +114,19 @@ def get_data_from_db(chat_id, name=''):
 
 con = connect("saves.db", check_same_thread=False)
 cur = con.cursor()
-SEWER_SKINS_SHOP = {'🤡': 100, '😒': 100, '😡': 100, '🤓': 100, '😀': 100, '😈': 100,
-                    '💩': 100, '👻': 100, '👺': 100, '👹': 100, '👿': 100, '💀': 100}
+CHARACTERISTICS = {'strength', 'agility', 'intelligence', 'lucky', 'wisdom', 'stamina'}
+SKINS_SHOP = {'town_Bram': {'🤡': 100, '😒': 100, '😡': 100, '🤓': 100, '😀': 100, '😈': 100,
+                            '💩': 100, '👻': 100, '👺': 100, '👹': 100, '👿': 100, '💀': 100}}
+SPELLS_SHOP = {'town_Bram': {'Усиленный удар': 100}}
 saves = {'example': {'name': '', 'gold': 0, 'lvl': 1, 'pos': {'map': 'town_Bram', 'x': 5, 'y': 4}, 'inventory': {}, 'skin': '😀',
-                     'need_xp': 0, 'xp': 0, 'spells': [], 'quests': [], 'inventory_max_n': 3,
-                     'buffer': {'enemies': [], 'drop_items': [], 'inventory_page': 0, 'inventory_slice': 20, 'fight_text': {'text': '', 'keyboard': ''}},
+                     'need_xp': 0, 'xp': 0, 'spells': [], 'quests': {}, 'inventory_max_n': 3,
+                     'buffer': {'enemies': [], 'drop_items': [], 'inventory_page': 0, 'inventory_slice': 20,
+                                'fight_text': {'text': '', 'keyboard': ''}, 'quest_keyboard': None},
                      'equip_items': {'head': '', 'body': '', 'pants': '', 'boots': ''},
                      'fight': {'damage': 0, 'block': 0, 'dodge': 0, 'chance_of_loot': 0, 'hp_regen': 0, 'mp_regen': 0,
                                'crit': 0, 'block_add': 0, 'hp': 0, 'mp': 0, 'max_hp': 0, 'max_mp': 0},
                      'char': {'strength': 1, 'agility': 1, 'lucky': 1, 'intelligence': 1, 'wisdom': 1, 'stamina': 1, 'free_char': 5}}}
 ENEMIES_ITEM_TEMPLATE = {'example': {'n': 0, 'chance': 0}}
+QUESTS_TEMPLATE = {'example': {'time': 0, 'completed': False}}
 ENEMIES = {'skins': [], 'example': {'char': {}, 'des': '', 'spells': {}, 'xp': 0, 'lvl': 0, 'skin': '', 'drop_items': {}, 'drop_gold': 0, 'drop_gold_edit': 0}}
 get_enemies_data_from_db()
