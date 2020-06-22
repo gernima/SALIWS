@@ -4,55 +4,42 @@ from random import randint
 from base_var_and_func import *
 
 
-def is_died(call):
-    if saves[call.from_user.id]['fight']['hp'] <= 0:
+def is_died(chat_id):
+    if saves[chat_id]['fight']['hp'] <= 0:
         return True
     return False
 
 
-def add_xp(call, xp):
-    saves[call.from_user.id]['xp'] += xp
-
-
-def check_lvl_up(call):
-    if saves[call.from_user.id]["xp"] >= saves[call.from_user.id]["need_xp"]:
-        return True
-    return False
-
-
-def level_up(call):
-    saves[call.from_user.id]["lvl"] += 1
-    if saves[call.from_user.id]["lvl"] % 5 == 0:
-        saves[call.from_user.id]["inventory_max_n"] += 1
-    saves[call.from_user.id]["need_xp"] = calc_xp_for_next_lvl(call)
-    update_char(call)
+def add_xp(chat_id, xp):
+    saves[chat_id]['xp'] += xp
 
 
 def check_enemy_died_and_killed_logic(call, enemy, bot):
     text = ''
+    chat_id = call.from_user.id
     if enemy.you_died_tf():
-        saves[call.from_user.id]['buffer']['enemies'].remove(enemy)
+        saves[chat_id]['buffer']['enemies'].remove(enemy)
         bonus_tf = False
-        if enemy.lvl > saves[call.from_user.id]['lvl']:
-            percent = abs(enemy.lvl - saves[call.from_user.id]['lvl']) * 0.1
+        if enemy.lvl > saves[chat_id]['lvl']:
+            percent = abs(enemy.lvl - saves[chat_id]['lvl']) * 0.1
             xp = round(percent * enemy.xp + enemy.xp, 1)
             text += f"Вы убили {enemy.skin} превосходящее вас по уровню за это вы получаете на {percent * 100}% больше опыта"
             bonus_tf = True
-        elif enemy.lvl == saves[call.from_user.id]['lvl']:
+        elif enemy.lvl == saves[chat_id]['lvl']:
             xp = enemy.xp
         else:
-            xp = round((1 - abs(saves[call.from_user.id]['lvl'] - enemy.lvl) * 0.1) * enemy.xp, 1)
-        add_xp(call, xp)
-        if check_lvl_up(call):
-            level_up(call)
-            saves[call.from_user.id]["char"]["free_char"] += 10
+            xp = round((1 - abs(saves[chat_id]['lvl'] - enemy.lvl) * 0.1) * enemy.xp, 1)
+        add_xp(chat_id, xp)
+        if check_lvl_up(chat_id):
+            level_up(chat_id)
+            saves[chat_id]["char"]["free_char"] += 10
             if bonus_tf:
-                text += f'Вы получаете {xp} ед.опыта\nВы повысили уровень, за это вы получаете 10 очков характеристик, ваш уровень {saves[call.from_user.id]["lvl"]}\nДо следующего уровня осталось {round(saves[call.from_user.id]["need_xp"] - saves[call.from_user.id]["xp"], 1)} ед.опыта'
+                text += f'Вы получаете {xp} ед.опыта\nВы повысили уровень, за это вы получаете 10 очков характеристик, ваш уровень {saves[chat_id]["lvl"]}\nДо следующего уровня осталось {round(saves[chat_id]["need_xp"] - saves[chat_id]["xp"], 1)} ед.опыта'
             else:
-                text += f'Вы убили {enemy.skin}, вы получаете {xp} ед.опыта\nВы повысили уровень, за это вы получаете 10 очков характеристик, ваш уровень {saves[call.from_user.id]["lvl"]}\nДо следующего уровня осталось {round(saves[call.from_user.id]["need_xp"] - saves[call.from_user.id]["xp"], 1)} ед.опыта'
+                text += f'Вы убили {enemy.skin}, вы получаете {xp} ед.опыта\nВы повысили уровень, за это вы получаете 10 очков характеристик, ваш уровень {saves[chat_id]["lvl"]}\nДо следующего уровня осталось {round(saves[chat_id]["need_xp"] - saves[chat_id]["xp"], 1)} ед.опыта'
         else:
-            text += f'Вы убили {enemy.skin}, вы получаете {xp} ед.опыта\nДо следующего уровня осталось {round(saves[call.from_user.id]["need_xp"] - saves[call.from_user.id]["xp"], 1)} ед.опыта'
-        saves[call.from_user.id]['buffer']['fight_text']['text'] = text + '\n'
+            text += f'Вы убили {enemy.skin}, вы получаете {xp} ед.опыта\nДо следующего уровня осталось {round(saves[chat_id]["need_xp"] - saves[chat_id]["xp"], 1)} ед.опыта'
+        saves[chat_id]['buffer']['fight_text']['text'] = text + '\n'
         drop_from_enemy(call, enemy, bot)
         return True
     return False
@@ -60,193 +47,204 @@ def check_enemy_died_and_killed_logic(call, enemy, bot):
 
 def drop_from_enemy(call, enemy, bot):
     text = ''
-    saves[call.from_user.id]['buffer']['fight_text']['keyboard'] = get_keyboard_drop_from_enemy(call)
-    saves[call.from_user.id]['buffer']["drop_items"] = []
+    chat_id = call.from_user.id
+    saves[chat_id]['buffer']["drop_items"] = []
     gold_edit = randint(-1 * ENEMIES[enemy.name]['drop_gold_edit'], ENEMIES[enemy.name]['drop_gold_edit'])
     gold_drop = ENEMIES[enemy.name]['drop_gold'] + gold_edit
-    saves[call.from_user.id]["gold"] += gold_drop
-    text += f"Выпало {gold_drop} золота\nВаш баланс: {saves[call.from_user.id]['gold']}"
+    saves[chat_id]["gold"] += gold_drop
+    text += f"Выпало {gold_drop} золота\nВаш баланс: {saves[chat_id]['gold']}"
     for item in ENEMIES[enemy.name]['drop_items'].keys():
         chance = randint(1, 100)
         if chance <= ENEMIES[enemy.name]['drop_items'][item]['chance']:
             for _ in range(ENEMIES[enemy.name]['drop_items'][item]['n']):
-                saves[call.from_user.id]['buffer']["drop_items"].append(item)
-    if len(saves[call.from_user.id]['buffer']["drop_items"]) != 0:
+                saves[chat_id]['buffer']["drop_items"].append(item)
+    if len(saves[chat_id]['buffer']["drop_items"]) != 0:
         text += '\n' + f"Выберите предметы:"
-    saves[call.from_user.id]['buffer']['fight_text']['text'] += text
+    saves[chat_id]['buffer']['fight_text']['text'] += text
 
 
 def drop_from_enemy_checker(call, bot):
-    if len(saves[call.from_user.id]['inventory'].keys()) != saves[call.from_user.id]['inventory_max_n']:
-        text = call.data[16:]
-        item = saves[call.from_user.id]['buffer']['drop_items'].pop(int(text))
-        inventory_add_item(call, item)
-        saves[call.from_user.id]['buffer']['fight_text']['text'] += '\n' + f'Вы подобрали {item}'
-        send_fight_text(call, bot)
-    else:
-        bot.answer_callback_query(callback_query_id=call.id, text=f'Ваш инвентарь полон')
-
-
-def inventory_add_item(call, item):
-    if item in saves[call.from_user.id]["inventory"]:
-        saves[call.from_user.id]["inventory"][item] += 1
-    else:
-        saves[call.from_user.id]["inventory"][item] = 1
-
-
-def mp_regen(call):
-    if saves[call.from_user.id]['fight']["mp"] < saves[call.from_user.id]['fight']['max_mp']:
-        if saves[call.from_user.id]['fight']["mp"] + saves[call.from_user.id]["fight"]["mp_regen"] < saves[call.from_user.id]['fight']['max_mp']:
-            saves[call.from_user.id]['fight']["mp"] += saves[call.from_user.id]["fight"]["mp_regen"]
+    chat_id = call.from_user.id
+    print(call.data, saves[chat_id]['buffer']['drop_items'])
+    if saves[chat_id]['buffer']['drop_items']:
+        if len(saves[chat_id]['inventory'].keys()) != saves[chat_id]['inventory_max_n']:
+            text = call.data[16:]
+            item = saves[chat_id]['buffer']['drop_items'].pop(int(text))
+            inventory_add_item(chat_id, item, 1)
+            saves[chat_id]['buffer']['fight_text']['text'] += '\n' + f'Вы подобрали {item}'
+            send_fight_text(call, bot)
         else:
-            saves[call.from_user.id]['fight']["mp"] = saves[call.from_user.id]['fight']['max_mp']
-
-
-def death(call, bot):
-    max_hp = get_hp_from_stamina(saves[call.from_user.id]["char"]["stamina"])
-    saves[call.from_user.id]['fight']['hp'] = max_hp
-    max_mp = get_mp_from_intelligence(saves[call.from_user.id]["char"]["intelligence"])
-    saves[call.from_user.id]['mp'] = max_mp
-    minus_xp = 0.1 * saves[call.from_user.id]['xp']
-    if saves[call.from_user.id]['xp'] - minus_xp >= 0:
-        saves[call.from_user.id]['xp'] -= minus_xp
+            bot.answer_callback_query(callback_query_id=call.id, text=f'Ваш инвентарь полон')
     else:
-        saves[call.from_user.id]['xp'] = 0
-    saves[call.from_user.id]['pos']['map'] = 'town_Bram'
-    saves[call.from_user.id]['pos']['x'] = 5
-    saves[call.from_user.id]['pos']['y'] = 2
-    saves[call.from_user.id]['buffer']['fight_text']['keyboard'] = get_fight_keyboard()
-    saves[call.from_user.id]['buffer']['fight_text']['text'] = ''
-    saves[call.from_user.id]['fight']['enemies'] = []
-    # bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
-    #                       text=f'Вы мертвы\n{load_map(call.from_user.id)}', reply_markup=ok_fight_keyboard)
+        send_map(call, bot)
 
 
-def check_death(call, bot):
-    if is_died(call):
-        death(call, bot)
-        return True
-    return False
+def mp_regen(chat_id):
+    if saves[chat_id]['fight']["mp"] < saves[chat_id]['fight']['max_mp']:
+        if saves[chat_id]['fight']["mp"] + saves[chat_id]["fight"]["mp_regen"] < saves[chat_id]['fight']['max_mp']:
+            saves[chat_id]['fight']["mp"] += saves[chat_id]["fight"]["mp_regen"]
+        else:
+            saves[chat_id]['fight']["mp"] = saves[chat_id]['fight']['max_mp']
+
+
+def death(chat_id, bot):
+    max_hp = get_hp_from_stamina(saves[chat_id]["char"]["stamina"])
+    saves[chat_id]['fight']['hp'] = max_hp
+    max_mp = get_mp_from_intelligence(saves[chat_id]["char"]["intelligence"])
+    saves[chat_id]['mp'] = max_mp
+    minus_xp = 0.1 * saves[chat_id]['xp']
+    if saves[chat_id]['xp'] - minus_xp >= 0:
+        saves[chat_id]['xp'] -= minus_xp
+    else:
+        saves[chat_id]['xp'] = 0
+    saves[chat_id]['pos']['map'] = 'town_Bram'
+    saves[chat_id]['pos']['x'] = 5
+    saves[chat_id]['pos']['y'] = 2
+    saves[chat_id]['buffer']['fight_text']['keyboard'] = get_fight_keyboard()
+    saves[chat_id]['buffer']['fight_text']['text'] = ''
+    saves[chat_id]['fight']['enemies'] = []
+
+
+def check_death(chat_id, bot):
+    if is_died(chat_id):
+        death(chat_id, bot)
 
 
 def fight_spells_checker(call, bot):
-    if len(saves[call.from_user.id]['buffer']['enemies']) != 0:
-        text = call.data
-        enemy = saves[call.from_user.id]['buffer']['enemies'][int(call.data.split('_')[1])]
-        if 'return_to_fight' in text:
-            saves[call.from_user.id]['buffer']['fight_text']['keyboard'] = get_fight_keyboard()
-            send_fight_text(call, bot)
-        elif 'усиленный удар' in text:
-            saves[call.from_user.id]['buffer']['fight_text']['text'] += '\n' + f'Вы использовали {text}'
-            attack(call, enemy, saves[call.from_user.id]["fight"]["damage"] * 1.1, bot)
+    chat_id = call.from_user.id
+    if len(saves[chat_id]['buffer']['enemies']) != 0:
+        data = call.data
+        enemy = saves[chat_id]['buffer']['enemies'][int(data.split('_')[1])]
+        if 'return_to_fight' in data:
+            if 'arena' in data:
+                pass
+            else:
+                saves[chat_id]['buffer']['fight_text']['keyboard'] = get_fight_keyboard()
+                send_fight_text(call, bot)
+        elif 'усиленный удар' in data:
+            if 'arena' in data:
+                pass
+            else:
+                saves[chat_id]['buffer']['fight_text']['text'] += '\n' + f'Вы использовали {data}'
+                attack(call, enemy, saves[chat_id]["fight"]["damage"] * 1.1, bot)
     else:
         send_fight_text(call, bot)
 
 
-def damaging(damage, call):
-    if saves[call.from_user.id]['fight']['block'] > 0:
-        saves[call.from_user.id]['fight']['hp'] = round(saves[call.from_user.id]['fight']['hp'] - damage + saves[call.from_user.id]['fight']['block'], 1)
+def damaging(damage, chat_id):
+    if saves[chat_id]['fight']['block'] > 0:
+        saves[chat_id]['fight']['hp'] = round(saves[chat_id]['fight']['hp'] - damage + saves[chat_id]['fight']['block'], 1)
     else:
-        saves[call.from_user.id]['fight']['hp'] = round(saves[call.from_user.id]['fight']['hp'] - damage, 1)
-    saves[call.from_user.id]['fight']['block'] = 0
+        saves[chat_id]['fight']['hp'] = round(saves[chat_id]['fight']['hp'] - damage, 1)
+    saves[chat_id]['fight']['block'] = 0
 
 
-def attack(call, enemy, attack_damage, bot):
+def attack(call, enemy, attack_damage, bot, arena=False):
+    chat_id = call.from_user.id
     damage = round(attack_damage - enemy.block, 1)
-    enemy.damaging(attack_damage)
-    if enemy.block >= attack_damage:
-        saves[call.from_user.id]['buffer']['fight_text']['text'] += '\n' + 'Блок противника поглотил весь урон'
+    if arena:
+        damaging(damage, enemy)
     else:
-        if enemy.hp < 0:
-            saves[call.from_user.id]['buffer']['fight_text']['text'] += '\n' + f'Вы нанесли {damage}❤, противник мертв'
+        enemy.damaging(attack_damage)
+    if enemy.block >= attack_damage:
+        saves[chat_id]['buffer']['fight_text']['text'] += '\n' + 'Блок противника поглотил весь урон'
+    else:
+        if (type(enemy) == int and (arena and saves[enemy]['hp'] < 0)) or (type(enemy) != int and (not arena and enemy.hp < 0)):
+            saves[chat_id]['buffer']['fight_text']['text'] += '\n' + f'Вы нанесли {damage}❤, противник мертв'
         else:
-            saves[call.from_user.id]['buffer']['fight_text']['text'] += '\n' + f'Вы нанесли {damage}❤, осталось {enemy.hp}❤'
-        if not check_enemy_died_and_killed_logic(call, enemy, bot):
-            enemy.fight(call=call, chance_per_percent=0.5)
+            if type(enemy) == int:
+                hp = saves[enemy]['hp']
+            else:
+                hp = enemy.hp
+            saves[chat_id]['buffer']['fight_text']['text'] += '\n' + f'Вы нанесли {damage}❤, осталось {hp}❤'
+        if not arena and not check_enemy_died_and_killed_logic(call, enemy, bot):
+            enemy.fight(call=chat_id, chance_per_percent=0.5)
             tf = True
             if enemy.you_skip_step_n != 0:
                 for i in range(enemy.you_skip_step_n):
-                    if check_death(call, bot):
+                    if check_death(chat_id, bot):
                         tf = False
                     elif tf:
-                        enemy.fight(call=call, chance_per_percent=0.5)
+                        enemy.fight(chat_id=chat_id, chance_per_percent=0.5)
                 enemy.you_skip_step_n = 0
             if tf:
-                if check_death(call, bot):
+                if check_death(chat_id, bot):
                     pass
+        elif arena:
+            saves[chat_id]['buffer']['fight_text']['keyboard'] = get_arena_fight_keyboard(enemy, your_step=False)
 
 
-def fight_block(call, enemy, bot):
-    # damage = round(saves[call.from_user.id]["fight"]["damage"] - enemy.block, 1)
-    saves[call.from_user.id]["fight"]["block"] += saves[call.from_user.id]["fight"]["block_add"]
-    saves[call.from_user.id]['buffer']['fight_text']['text'] += '\n' + f'Вы защищаетесь'
-    if not check_enemy_died_and_killed_logic(call, enemy, bot):
-        if not check_death(call, bot):
-            enemy.fight(call=call, chance_per_percent=0.5)
+def fight_block(call, enemy, bot, arena=False):
+    chat_id = call.from_user.id
+    # damage = round(saves[chat_id]["fight"]["damage"] - enemy.block, 1)
+    saves[chat_id]["fight"]["block"] += saves[chat_id]["fight"]["block_add"]
+    saves[chat_id]['buffer']['fight_text']['text'] += '\n' + f'Вы защищаетесь'
+    if not arena and not check_enemy_died_and_killed_logic(call, enemy, bot):
+        if not check_death(chat_id, bot):
+            enemy.fight(chat_id=chat_id, chance_per_percent=0.5)
             if enemy.you_skip_step_n != 0:
                 for i in range(enemy.you_skip_step_n):
-                    if not check_death(call, bot):
-                        saves[call.from_user.id]['buffer']['fight_text']['text'] += '\n' + 'Вы пропускаете ход'
-                        enemy.fight(call=call, chance_per_percent=0.5)
+                    if not check_death(chat_id, bot):
+                        saves[chat_id]['buffer']['fight_text']['text'] += '\n' + 'Вы пропускаете ход'
+                        enemy.fight(chat_id=chat_id, chance_per_percent=0.5)
                         enemy.block = 0
-                        # if self.check_death(get_move_keyboard(), call):
-                        #     bot.register_next_step_handler(call, self.hero_move)
                 enemy.you_skip_step_n = 0
-            saves[call.from_user.id]['fight']['block'] = 0
-            if check_death(call, bot):
+            saves[chat_id]['fight']['block'] = 0
+            if check_death(chat_id, bot):
                 pass  # просто проверить мертв ли
-                # send_map(call, bot)
-            # else:
-            #     bot.register_next_step_handler(call, self.fight, enemy)
+    elif arena:
+        saves[chat_id]['buffer']['fight_text']['keyboard'] = get_arena_fight_keyboard(enemy, your_step=False)
 
 
-def fight_dodge(call, enemy, bot):
+def fight_dodge(call, enemy, bot, arena=False):
+    chat_id = call.from_user.id
     dodge_chance = randint(1, 100)
-    if dodge_chance <= saves[call.from_user.id]["fight"]["dodge"]:
-        saves[call.from_user.id]['buffer']['fight_text']['text'] += '\n' + 'Вы смогли уклониться и сумели контратаковать'
-        damage = round(saves[call.from_user.id]["fight"]["damage"] - enemy.block, 1)
-        enemy.damaging(saves[call.from_user.id]["fight"]["damage"])
-        if enemy.block >= saves[call.from_user.id]["fight"]["damage"]:
-            saves[call.from_user.id]['buffer']['fight_text']['text'] += '\n' + 'Блок противника поглотил весь урон'
+    if dodge_chance <= saves[chat_id]["fight"]["dodge"]:
+        saves[chat_id]['buffer']['fight_text']['text'] += '\n' + 'Вы смогли уклониться и сумели контратаковать'
+        if arena:
+            damage = round(saves[chat_id]["fight"]["damage"] - saves[enemy]['block'], 1)
         else:
-            saves[call.from_user.id]['buffer']['fight_text']['text'] += '\n' + f'Вы нанесли {damage}❤, осталось {enemy.hp}❤'
-            if not check_enemy_died_and_killed_logic(call, enemy, bot):
+            damage = round(saves[chat_id]["fight"]["damage"] - enemy.block, 1)
+        enemy.damaging(damage)
+        if (not arena and (enemy.block >= saves[chat_id]["fight"]["damage"])) or \
+                (arena and (saves[enemy]['block'] >= saves[chat_id]["fight"]["damage"])):
+            saves[chat_id]['buffer']['fight_text']['text'] += '\n' + 'Блок противника поглотил весь урон'
+        else:
+            if arena:
+                enemy_hp = saves[enemy]['hp']
+            else:
+                enemy_hp = enemy.hp
+            saves[chat_id]['buffer']['fight_text']['text'] += '\n' + f'Вы нанесли {damage}❤, осталось {enemy_hp}❤'
+            if not arena and not check_enemy_died_and_killed_logic(call, enemy, bot):
                 if enemy.you_skip_step_n != 0:
                     for i in range(enemy.you_skip_step_n):
-                        if not check_death(call, bot):
-                            # send_map(call, bot)
-                            # bot.send_call(call.from_user.id, 'Вы пропускаете ход', reply_markup=get_fight_keyboard())
-                            enemy.fight(call=call, chance_per_percent=0.5)
+                        if not check_death(chat_id, bot):
+                            enemy.fight(chat_id=chat_id, chance_per_percent=0.5)
                 enemy.you_skip_step_n = 0
-                if check_death(call, bot):
+                if check_death(chat_id, bot):
                     pass
-                    # send_map(call, bot)
-                # else:
-                #     bot.register_next_step_handler(call, self.fight, enemy)
     else:
-        saves[call.from_user.id]['buffer']['fight_text']['text'] += '\n' + 'Вы не смогли уклониться'
-        if not check_enemy_died_and_killed_logic(call, enemy, bot):
-            enemy.fight(call=call, chance_per_percent=0.5)
+        saves[chat_id]['buffer']['fight_text']['text'] += '\n' + 'Вы не смогли уклониться'
+        if not arena and not check_enemy_died_and_killed_logic(call, enemy, bot):
+            enemy.fight(chat_id=chat_id, chance_per_percent=0.5)
             if enemy.you_skip_step_n != 0:
                 for i in range(enemy.you_skip_step_n):
-                    if not check_death(call, bot):
-                        saves[call.from_user.id]['buffer']['fight_text']['text'] += '\n' + 'Вы пропускаете ход'
-                        enemy.fight(call=call, chance_per_percent=0.5)
-            if check_death(call, bot):
+                    if not check_death(chat_id, bot):
+                        saves[chat_id]['buffer']['fight_text']['text'] += '\n' + 'Вы пропускаете ход'
+                        enemy.fight(chat_id=chat_id, chance_per_percent=0.5)
+            if check_death(chat_id, bot):
                 pass
-                # send_map(call, bot)
-            # else:
-            #     bot.register_next_step_handler(call, self.fight, enemy)
 
 
 def send_fight_text(call, bot):
-    if len(saves[call.from_user.id]['buffer']["drop_items"]) == 0:
-        bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
-                              text=saves[call.from_user.id]['buffer']['fight_text']['text'],
-                              reply_markup=saves[call.from_user.id]['buffer']['fight_text']['keyboard'])
+    chat_id = call.from_user.id
+    if saves[chat_id]['buffer']["enemies"]:
+        bot.edit_message_text(chat_id=chat_id, message_id=call.message.message_id,
+                              text=saves[chat_id]['buffer']['fight_text']['text'],
+                              reply_markup=saves[chat_id]['buffer']['fight_text']['keyboard'])
     else:
-        bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
-                              text=saves[call.from_user.id]['buffer']['fight_text']['text'],
+        bot.edit_message_text(chat_id=chat_id, message_id=call.message.message_id,
+                              text=saves[chat_id]['buffer']['fight_text']['text'],
                               reply_markup=get_keyboard_drop_from_enemy(call))
 
 
@@ -257,14 +255,15 @@ def clear_fight_logs(chat_id):
 
 
 def fight_checker(call, bot):
+    chat_id = call.from_user.id
     if call.data == 'fight_ready':
         send_map(call, bot)
-        clear_fight_logs(call.from_user.id)
-        save_to_db(call.from_user.id)
-    elif len(saves[call.from_user.id]['buffer']['enemies']) != 0:
-        enemy = saves[call.from_user.id]['buffer']['enemies'][int(call.data.split('_')[2])]
+        clear_fight_logs(chat_id)
+        save_to_db(chat_id)
+    elif len(saves[chat_id]['buffer']['enemies']) != 0:
+        enemy = saves[chat_id]['buffer']['enemies'][int(call.data.split('_')[2])]
         if 'attack' in call.data:
-            attack(call, enemy, float(saves[call.from_user.id]["fight"]["damage"]), bot)
+            attack(call, enemy, float(saves[chat_id]["fight"]["damage"]), bot)
             send_fight_text(call, bot)
         elif 'block' in call.data:
             fight_block(call, enemy, bot)
@@ -273,11 +272,11 @@ def fight_checker(call, bot):
             fight_dodge(call, enemy, bot)
             send_fight_text(call, bot)
         elif 'spells' in call.data:
-            bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id, text='Вот ваши способности', reply_markup=get_spells_keyboard(call))
+            bot.edit_message_text(chat_id=chat_id, message_id=call.message.message_id, text='Вот ваши способности', reply_markup=get_spells_keyboard(call))
         elif 'inv' in call.data:
             send_inventory(call, bot)
         else:
-            bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id, text=call.message.text + '\n' + 'Из-за своей оплошности вы пропустили ход', reply_markup=get_fight_keyboard())
-        mp_regen(call)
+            bot.edit_message_text(chat_id=chat_id, message_id=call.message.message_id, text=call.message.text + '\n' + 'Из-за своей оплошности вы пропустили ход', reply_markup=get_fight_keyboard())
+        mp_regen(chat_id)
     else:
         send_map(call, bot)

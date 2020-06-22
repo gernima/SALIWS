@@ -57,66 +57,66 @@ class Enemy:
             self.hp = round(self.hp - damage + self.block, 1)
         self.block = 0
 
-    def attack(self, call):
-        damaging(self.damage, call)
+    def attack(self, chat_id):
+        damaging(self.damage, chat_id)
 
     def you_died_tf(self):
         if self.hp <= 0:
             return True
         return False
 
-    def spell_use(self, call):
+    def spell_use(self, chat_id):
         pass
 
-    def attack_action(self, call):
-        if saves[call.from_user.id]['fight']['block'] >= self.damage:
-            saves[call.from_user.id]['buffer']['fight_text']['text'] += '\n' + 'Ваш блок поглотил весь урон'
+    def attack_action(self, chat_id):
+        if saves[chat_id]['fight']['block'] >= self.damage:
+            saves[chat_id]['buffer']['fight_text']['text'] += '\n' + 'Ваш блок поглотил весь урон'
         else:
-            damage = round(self.damage - saves[call.from_user.id]['fight']['block'], 1)
-            damaging(self.damage, call)
-            saves[call.from_user.id]['buffer']['fight_text']['text'] += '\n' + f'{self.name} {self.skin} нанес вам {damage}❤ ед.урона, у вас осталось {saves[call.from_user.id]["fight"]["hp"]}❤'
+            damage = round(self.damage - saves[chat_id]['fight']['block'], 1)
+            damaging(self.damage, chat_id)
+            saves[chat_id]['buffer']['fight_text']['text'] += '\n' + f'{self.name} {self.skin} нанес вам {damage}❤ ед.урона, у вас осталось {saves[chat_id]["fight"]["hp"]}❤'
 
-    def block_action(self, call):
+    def block_action(self, chat_id):
         self.block += self.block_add_int
-        saves[call.from_user.id]['buffer']['fight_text']['text'] += '\n' + f'{self.name} {self.skin} защищается'
+        saves[chat_id]['buffer']['fight_text']['text'] += '\n' + f'{self.name} {self.skin} защищается'
 
-    def dodge_action(self, call):
+    def dodge_action(self, chat_id):
         dodge_chance = randint(1, 100)
-        saves[call.from_user.id]['buffer']['fight_text']['text'] += '\n' + f'{self.name} {self.skin} пытается уклониться..'
+        saves[chat_id]['buffer']['fight_text']['text'] += '\n' + f'{self.name} {self.skin} пытается уклониться..'
         if dodge_chance <= self.dodge:
-            saves[call.from_user.id]['buffer']['fight_text']['text']['text'] += '\n' + f'{self.name} {self.skin} смог уклониться и контатакует'
+            saves[chat_id]['buffer']['fight_text']['text']['text'] += '\n' + f'{self.name} {self.skin} смог уклониться и контатакует'
             # attack
-            self.attack_action(call)
+            self.attack_action(chat_id)
         else:
-            saves[call.from_user.id]['buffer']['fight_text']['text'] += '\n' + f'{self.name} {self.skin} не смог уклониться'
+            saves[chat_id]['buffer']['fight_text']['text'] += '\n' + f'{self.name} {self.skin} не смог уклониться'
 
-    def chance_actions(self, first_chance, second_chance, call):
+    def chance_actions(self, first_chance, second_chance, chat_id):
         if first_chance:
             # attack
-            self.attack_action(call)
+            self.attack_action(chat_id)
         elif second_chance:
             # block
-            self.block_action(call)
+            self.block_action(chat_id)
         else:
             # dodge
-            self.dodge_action(call)
+            self.dodge_action(chat_id)
         self.f_mp_regen()
-        # send_fight_text(call, self.bot)
 
-    def fight_actions(self, call, another_chance, chance_per_int, n):
-        self.chance_actions(n <= chance_per_int, n <= another_chance + chance_per_int, call)
 
-    def fight(self, call, chance_per_percent, from_n=1, to_n=100):
+    def fight_actions(self, chat_id, another_chance, chance_per_int, n):
+        self.chance_actions(n <= chance_per_int, n <= another_chance + chance_per_int, chat_id)
+
+    def fight(self, chat_id, chance_per_percent, from_n=1, to_n=100):
         n = randint(from_n, to_n)
         chance_per_int = int(to_n * chance_per_percent)
         another_chance = (to_n - chance_per_int) / 2
         chance_of_spell = randint(0, 1)
         # chance_of_spell = 0
         if chance_of_spell == 0:
-            if not self.spell_use(call.from_user.id):
-                self.fight_actions(call, another_chance, chance_per_int, n)
+            if not self.spell_use(chat_id):
+                self.fight_actions(chat_id, another_chance, chance_per_int, n)
         else:
-            self.fight_actions(call, another_chance, chance_per_int, n)
+            self.fight_actions(chat_id, another_chance, chance_per_int, n)
 
 
 class Spider(Enemy):
@@ -127,8 +127,8 @@ class Spider(Enemy):
                          ENEMIES[name]['char']['wisdom'], ENEMIES[name]['char']['stamina'], name,
                          enhancement_n, x, y, bot, ENEMIES[name]['lvl'])
 
-    def spell_use(self, call):
-        super().spell_use(call)
+    def spell_use(self, chat_id):
+        super().spell_use(chat_id)
         chance_of_activation = randint(1, 100)
         n_spells = len(ENEMIES[self.name]['spells'])
         if n_spells > 0:
@@ -140,12 +140,12 @@ class Spider(Enemy):
             n += 1
             if self.mp >= spell_mp:
                 if n * chance >= chance_of_activation:
-                    saves[call.from_user.id]['buffer']['fight_text']['text'] += '\n' + f"{self.name} {self.name} использовал {spell}"
+                    saves[chat_id]['buffer']['fight_text']['text'] += '\n' + f"{self.name} {self.name} использовал {spell}"
                     if spell == 'Опутывание паутиной':
-                        saves[call.from_user.id]['buffer']['fight_text']['text'] += '\n' + "Вас опутали паутиной, вы пытаетесь выбраться и кажется вам скоро удастся"
+                        saves[chat_id]['buffer']['fight_text']['text'] += '\n' + "Вас опутали паутиной, вы пытаетесь выбраться и кажется вам скоро удастся"
                         self.you_skip_step_n = 2
                     elif spell == 'Защита паутиной':
-                        saves[call.from_user.id]['buffer']['fight_text']['text'] += '\n' + f"{self.name} {self.skin} опутал себя паутиной в надежде защитить себя"
+                        saves[chat_id]['buffer']['fight_text']['text'] += '\n' + f"{self.name} {self.skin} опутал себя паутиной в надежде защитить себя"
                         self.block += self.block_add_int
                     self.mp -= spell_mp
                     return True

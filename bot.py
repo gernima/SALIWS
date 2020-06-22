@@ -16,7 +16,26 @@ load_dotenv()
 # else:
 token = environ['dev_token']
 bot = telebot.TeleBot(token)
-print('start')
+
+
+def check_arena_queue():
+    while True:
+        if len(arena_queue) >= 2:
+            opponents = sample(arena_queue, 2)
+            arena_queue.remove(opponents[0])
+            arena_queue.remove(opponents[1])
+            if randint(0, 1) == 0:
+                who_first = opponents[0]
+            else:
+                who_first = opponents[1]
+            edit_message(bot, opponents[0], f'Начат бой против {saves[opponents[0]]["name"]}', get_arena_fight_keyboard(opponents[0], who_first))
+            edit_message(bot, opponents[1], f'Начат бой против {saves[opponents[1]]["name"]}', get_arena_fight_keyboard(opponents[1], who_first))
+            print(f'arena_fight {opponents[0]} {saves[opponents[0]]["name"]} vs {opponents[1]} {saves[opponents[1]]["name"]}')
+
+
+@bot.callback_query_handler(func=lambda call: 'fight' in call.data.split('_')[0])
+def fight(call):
+    fight_checker(call, bot)
 
 
 @bot.callback_query_handler(func=lambda call: 'quest_' in call.data and '_quest_' not in call.data)
@@ -40,6 +59,12 @@ def librarian(call):
 def sewer(call):
     if 'town_Bram' in saves[call.from_user.id]['pos']['map']:
         dialogs.sewer(call, bot)
+
+
+@bot.callback_query_handler(func=lambda call: 'arena' in call.data.split('_')[0])
+def arena_man(call):
+    if 'town_Bram' in saves[call.from_user.id]['pos']['map']:
+        dialogs.arena(call, bot)
 
 
 @bot.callback_query_handler(func=lambda call: 'char_' in call.data)
@@ -90,24 +115,28 @@ def spell(call):
     fight_spells_checker(call, bot)
 
 
-@bot.callback_query_handler(func=lambda call: 'fight' in call.data.split('_')[0])
-def fight(call):
-    fight_checker(call, bot)
-
-
 @bot.callback_query_handler(func=lambda call: 'mode' in call.data.split('_')[0])
 def choice_mode(call):
     if call.data == 'mode_single':
+        load_mode(call)
+
+
+def load_mode(call, is_call=True):
+    if is_call:
         get_data_from_db(call.from_user.id, name=call.from_user.username)
         clear_fight_logs(call.from_user.id)
         bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
                               text=load_map(call.from_user.id),
                               reply_markup=get_move_keyboard())
+    else:
+        get_data_from_db(call.chat.id, name=call.from_user.username)
+        clear_fight_logs(call.chat.id)
+        bot.send_message(chat_id=call.chat.id, text=load_map(call.chat.id), reply_markup=get_move_keyboard())
 
 
 @bot.callback_query_handler(func=lambda call: 'inventory' in call.data.split('_')[0])
 def inventory(call):
-    if call.data == 'inventory_return':
+    if 'return' in call.data:
         if len(saves[call.from_user.id]['buffer']['enemies']) != 0:
             send_fight_text(call, bot)
         else:
@@ -191,6 +220,11 @@ def check_cell(call, x, y):
                 new_map = 'town_Bram'
                 y = 4
                 x = 5
+            elif cell == '🧔':
+                bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
+                                      text='Новая кровь, чего ждешь?', reply_markup=get_arena_man_keyboard())
+                save_to_db(call.from_user.id)
+                return True
         elif this_map == 'town_Bram_sewing':
             if cell == '🚪':
                 new_map = 'town_Bram'
@@ -218,27 +252,40 @@ def check_cell(call, x, y):
                 x = 5
         saves[call.from_user.id]['pos']['y'] = y
         saves[call.from_user.id]['pos']['x'] = x
-        saves[call.from_user.id]['pos']['map'] = new_map
-        if cell == '🚪' or cell == '🧵' or cell == '📚' or cell == '⚔':
+        if saves[call.from_user.id]['pos']['map'] != new_map:
             save_to_db(call.from_user.id)
+        saves[call.from_user.id]['pos']['map'] = new_map
     return False
 
 
-@bot.message_handler(commands=['start', 'help'])
+@bot.message_handler(commands=['start', 'help', 'restart'])
 def commands(message):
     if message.text == '/start':
         bot.send_message(message.chat.id, 'Выберите режим игры', reply_markup=choice_mode_keyboard)
     elif message.text == '/help':
         bot.send_message(message.chat.id, 'Помощь? Я мало с чем могу помочь. Ты в башне, она разделена на множество этажей, в каждый этаж универсален. Вокруг башни мы построили город, в нем есть много всего. Возвращаться каждый в город не удобно, так что мы смогли некоторые этажи превратить в мини-города. Вроде как все! Ах да, после 5 этажа, башня каждый раз генерируется случайной, так что надейся на удачу.', reply_markup=choice_mode_keyboard)
+    elif message.text == '/restart':
+        cur.execute(f"""Delete from auction where chat_id={message.chat.id}""")
+        cur.execute(f"""Delete from promocodes where chat_id={message.chat.id}""")
+        cur.execute(f"""Delete from users_shop where chat_id={message.chat.id}""")
+        cur.execute(f"""Delete from users where chat_id={message.chat.id}""")
+        del saves[message.chat.id]
+        load_mode(message, is_call=False)
 
 
-chat_ids = [int(x[0]) for x in cur.execute("""Select chat_id from users""").fetchall()]
-if chat_ids:
-    for i in chat_ids:
-        get_data_from_db(i)
-
-
+# thread_arena_queue = Thread(target=check_arena_queue(), args=(bot))
+# thread_arena_queue.start()
+thread_check_quest = Thread(target=check_quest_complete)
+thread_check_quest.start()
+print('thread_check_quest started')
+thread_update_data_from_db = Thread(target=update_data_from_db_constant)
+thread_update_data_from_db.start()
+print('thread_update_data started')
+thread_check_arena_fight_queue = Thread(target=check_arena_queue)
+thread_check_arena_fight_queue.start()
+print('thread_check_arena_fight_queue started')
+print('bot start')
 # try:
-bot.polling(none_stop=True, interval=0)
+bot.polling()
 # except Exception as e:
 #     print(f'bot.polling {e}')

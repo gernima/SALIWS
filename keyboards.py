@@ -127,6 +127,38 @@ def get_fight_keyboard():
     return keyboard
 
 
+def get_arena_man_keyboard():
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton(text="Зарегистрироваться на бой", callback_data="arena_man_reg"))
+    keyboard.add(types.InlineKeyboardButton(text="До свидания", callback_data="arena_man_bye"))
+    return keyboard
+
+
+def get_arena_reg_keyboard(call):
+    keyboard = types.InlineKeyboardMarkup()
+    if call.from_user.id not in arena_queue:
+        keyboard.add(types.InlineKeyboardButton(text="Зарегистрироваться", callback_data="arena_man_reg_yes"))
+    else:
+        keyboard.add(types.InlineKeyboardButton(text="Уйти с очереди", callback_data="arena_man_reg_no"))
+    keyboard.add(types.InlineKeyboardButton(text="Может что-то другое?", callback_data="arena_man_reg_leave"))
+    return keyboard
+
+
+def get_arena_fight_keyboard(opponent_chat_id, your_step=True):
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton("Сдаться", callback_data=f'arena_fight_leave_{opponent_chat_id}'))
+    if your_step:
+        keyboard.add(types.InlineKeyboardButton("Ваш ход"))
+        keyboard.add(types.InlineKeyboardButton('Атака', callback_data=f'arena_fight_attack_{opponent_chat_id}'),
+                     types.InlineKeyboardButton('Уклонение', callback_data=f'arena_fight_dodge_{opponent_chat_id}'),
+                     types.InlineKeyboardButton('Блок', callback_data=f'arena_fight_block_{opponent_chat_id}'))
+        keyboard.add(types.InlineKeyboardButton("Способности", callback_data=f'arena_fight_spells_{opponent_chat_id}'),
+                     types.InlineKeyboardButton('Инвентарь', callback_data=f'arena_fight_inv_{opponent_chat_id}'))
+    else:
+        keyboard.add(types.InlineKeyboardButton("Ход противника"))
+    return keyboard
+
+
 def get_librarian_keyboard():
     keyboard = types.InlineKeyboardMarkup()
     keyboard.add(types.InlineKeyboardButton(text="Здравствуйте", callback_data=f"librarian_talk_hi"))
@@ -137,16 +169,15 @@ def get_librarian_keyboard():
 
 def get_keyboard_drop_from_enemy(call):
     keyboard = types.InlineKeyboardMarkup()
-    for i in range(len(saves[call.from_user.id]['buffer']["drop_items"])):
-        keyboard.add(types.InlineKeyboardButton(text=saves[call.from_user.id]['buffer']["drop_items"][i], callback_data=f"drop_from_enemy_{i}"))
+    for item_i in range(len(saves[call.from_user.id]['buffer']["drop_items"])):
+        keyboard.add(types.InlineKeyboardButton(text=saves[call.from_user.id]['buffer']["drop_items"][item_i], callback_data=f"drop_from_enemy_{item_i}"))
     keyboard.add(types.InlineKeyboardButton('Готово!', callback_data='fight_ready'))
     return keyboard
 
 
 def get_spells_keyboard(call):
     keyboard = types.InlineKeyboardMarkup()
-    keyboard.add(types.InlineKeyboardButton(text='назад',
-                                            callback_data=f"spell_{0}_return_to_fight"))
+    keyboard.add(types.InlineKeyboardButton(text='назад', callback_data=f"spell_{0}_return_to_fight"))
     for spell in saves[call.from_user.id]['spells']:
         keyboard.add(types.InlineKeyboardButton(text=spell, callback_data=f"spell_{0}_use_{spell}"))
     return keyboard
@@ -200,30 +231,21 @@ def get_librarian_spells_shop_keyboard(call):
     return keyboard
 
 
-def show_quest(chat_id, name):
-    if name in saves[chat_id]['quests'].keys():
-        for quest in saves[chat_id]['quests'].keys():
-            a = cur.execute(f"""Select time, need_lvl, need_items from quests where name = '{quest}'""").fetchall()
-            tf = True
-            for item in a[2]:
-                if item in saves[chat_id]['inventory'] and tf:
-                    tf = True
-                elif tf:
-                    tf = False
-                    break
-            if saves[chat_id]['quests'][quest]['completed'] or (a[1] <= saves[chat_id]['lvl'] and tf):
-                return True
-            if time() - saves[chat_id]['quests'][quest]['time'] < a[0]:
-                return False
-    return True
+def show_quest(chat_id, quest):
+    if (quest in saves[chat_id]['quests_time']) and (int(time()) - saves[chat_id]['quests_time'][quest] >= QUESTS[quest]['time']):
+        del saves[chat_id]['quests_time'][quest]
+    return ((QUESTS[quest]['need_lvl'] <= saves[chat_id]['lvl']) and (quest not in saves[chat_id]['quests']) and
+            (quest not in saves[chat_id]['quests_time'])) or \
+           ((QUESTS[quest]['need_lvl'] <= saves[chat_id]['lvl']) and (quest in saves[chat_id]['quests_time']) and
+             (int(time()) - saves[chat_id]['quests_time'][quest] >= QUESTS[quest]['time'])) or quest in saves[chat_id]['quests']
 
 
-def get_sewer_keyboard(call):
+def get_sewer_keyboard(call, show_quest_tf=True):
     keyboard = types.InlineKeyboardMarkup()
     keyboard.add(types.InlineKeyboardButton(text="Здравствуйте", callback_data=f"sewer_talk_hi"))
     keyboard.add(types.InlineKeyboardButton(text="Магазин скинов", callback_data=f"sewer_skins_shop"))
-    if show_quest(call.from_user.id, 'sewer'):
-        keyboard.add(types.InlineKeyboardButton(text="Сбор паутины", callback_data=f"sewer_quest_Сбор паутины для швеи"))
+    if show_quest(call.from_user.id, 'Сбор паутины для швеи') and show_quest_tf:
+        keyboard.add(types.InlineKeyboardButton(text="Помощь не требуется?", callback_data=f"sewer_quest_Сбор паутины для швеи"))
     keyboard.add(types.InlineKeyboardButton(text="До свидания", callback_data=f"sewer_talk_bye"))
     return keyboard
 
