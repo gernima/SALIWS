@@ -34,6 +34,54 @@ def yes_or_no_quest(call, bot):
     saves[chat_id]['buffer']['quest_keyboard'] = None
 
 
+def shop(call, bot):
+    chat_id = call.from_user.id
+    if call.data == 'shop_man_shop':
+        edit_message(bot, call, 'Все, что у меня есть', get_shop_items_keyboard(call))  
+    elif 'shop_man_shop_' in call.data:
+        if 'items_return' in call.data:
+            edit_message(bot, call, 'Может что-то другое?', get_shop_items_keyboard(call))
+        elif 'page' in call.data:
+            if 'next' in call.data:
+                if len(SHOP) > (saves[chat_id]['buffer']['shop_page'] + 1) * saves[chat_id]['buffer']['shop_page_slice']:
+                    saves[call.from_user.id]['buffer']['shop_page'] += 1
+            elif 'prev' in call.data:
+                if saves[call.from_user.id]['buffer']['shop_page'] - 1 >= 0:
+                    saves[call.from_user.id]['buffer']['shop_page'] -= 1
+            edit_message(bot, call, 'Все, что у меня есть', get_shop_items_keyboard(call))
+        elif 'return' in call.data:
+            edit_message(bot, call, 'Что-то еще?', get_shop_man_keyboard())
+        elif 'buy' in call.data:
+            item = call.data.split("_")[4:][0]
+            if SHOP[item]['n'] - 1 > 0:
+                if len(saves[chat_id]['inventory'].keys()) != saves[chat_id]['inventory_max_n']:
+                    if SHOP[item]['cost_buy'] >= saves[chat_id]['gold']:
+                        SHOP[item]['n'] -= 1
+                        saves[chat_id]['gold'] -= SHOP[item]['cost_buy']
+                        inventory_add_item(chat_id, item, 1)
+                        save_to_db(chat_id)
+                        bot.answer_callback_query(callback_query_id=call.id, text=f'Вы купили {item}')
+                    else:
+                        bot.answer_callback_query(callback_query_id=call.id, text='Недостаточно золота')
+                else:
+                    bot.answer_callback_query(callback_query_id=call.id, text='Инвентарь полон')
+            else:
+                bot.answer_callback_query(callback_query_id=call.id, text='Товар закончился, ждите новый')
+        elif 'sell' in call.data:
+            item = call.data.split("_")[4:][0]
+            if item in saves[chat_id]['inventory']:
+                inventory_del_item(chat_id, item, 1)
+                SHOP[item]['n'] += 1
+                saves[chat_id]['gold'] += SHOP[item]['cost_sell']
+                save_to_db(chat_id)
+                bot.answer_callback_query(callback_query_id=call.id, text=f'Вы продали {item}')
+            else:
+                bot.answer_callback_query(callback_query_id=call.id, text=f'У вас нет данного предмета')
+        else:
+            item = call.data.split("_")[3:][0]
+            edit_message(bot, call, f'{item}\n\n{ITEMS[item]["des"]}', get_shop_buy_sell_nothing_keyboard(item))
+
+
 def librarian(call, bot):
     chat_id = call.from_user.id
     if call.data == 'librarian_talk_hi':

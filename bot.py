@@ -39,32 +39,33 @@ def fight(call):
 
 
 @bot.callback_query_handler(func=lambda call: 'quest_' in call.data and '_quest_' not in call.data)
-def quest_yes_or_no(call):
+def questyes_or_no(call):
     dialogs.yes_or_no_quest(call, bot)
 
 
 @bot.callback_query_handler(func=lambda call: 'sewer_skins_shop_yes' in call.data or 'sewer_skins_shop_no' in call.data)
 def yes_or_no_skins(call):
-    if 'town_Bram' in saves[call.from_user.id]['pos']['map']:
-        dialogs.yes_or_no_skins(call, bot)
+    dialogs.yes_or_no_skins(call, bot)
 
 
 @bot.callback_query_handler(func=lambda call: 'librarian' in call.data.split('_')[0])
 def librarian(call):
-    if 'town_Bram' in saves[call.from_user.id]['pos']['map']:
-        dialogs.librarian(call, bot)
+    dialogs.librarian(call, bot)
 
 
 @bot.callback_query_handler(func=lambda call: 'sewer' in call.data.split('_')[0])
 def sewer(call):
-    if 'town_Bram' in saves[call.from_user.id]['pos']['map']:
-        dialogs.sewer(call, bot)
+    dialogs.sewer(call, bot)
 
 
 @bot.callback_query_handler(func=lambda call: 'arena' in call.data.split('_')[0])
 def arena_man(call):
-    if 'town_Bram' in saves[call.from_user.id]['pos']['map']:
-        dialogs.arena(call, bot)
+    dialogs.arena(call, bot)
+
+
+@bot.callback_query_handler(func=lambda call: 'shop' in call.data.split('_')[0])
+def shop(call):
+    dialogs.shop(call, bot)
 
 
 @bot.callback_query_handler(func=lambda call: 'char_' in call.data)
@@ -115,10 +116,35 @@ def spell(call):
     fight_spells_checker(call, bot)
 
 
+@bot.callback_query_handler(func=lambda call: 'reg_name' in call.data)
+def yon_name(call):
+    if 'yes' in call.data:
+        name = call.data.split('_')[-1]
+        save_to_db(call.from_user.id, name) 
+        send_map(call, bot)
+    else:
+        bot.send_message(call.from_user.id, 'Укажите как к вам обращаться')
+        bot.register_next_step_handler(call.message, reg_name)
+
+
+def reg_name(message):
+    name = message.text
+    if len(name) <= 24:
+        bot.send_message(message.chat.id, "Вы уверены, что хотите чтобы вас звали {}?".format(name),
+                         reply_markup=get_yes_or_no_reg_name_keyboard(name))
+    else:
+        bot.send_message(message.chat.id, "Длина ника не должна превышать 24 символа, введите другой".format(name))
+        bot.register_next_step_handler(message, reg_name)
+
+
 @bot.callback_query_handler(func=lambda call: 'mode' in call.data.split('_')[0])
 def choice_mode(call):
     if call.data == 'mode_single':
-        load_mode(call)
+        if call.from_user.id in saves:
+            send_map(call, bot)
+        else:
+            bot.send_message(call.from_user.id, 'Укажите как к вам обращаться, длина ника не должна превышать 24 символа')
+            bot.register_next_step_handler(call.message, reg_name)
 
 
 def load_mode(call, is_call=True):
@@ -142,20 +168,18 @@ def inventory(call):
         else:
             send_map(call, bot)
     elif 'page' in call.data:
-        if call.data == 'inventory_next_page':
+        if 'next' in call.data:
             if len(saves[call.from_user.id]['inventory']) > (saves[call.from_user.id]['buffer']['inventory_page'] + 1) * saves[call.from_user.id]['buffer']['inventory_slice']:
                 saves[call.from_user.id]['buffer']['inventory_page'] += 1
-        elif call.data == 'inventory_prev_page':
+        elif 'prev' in call.data:
             if saves[call.from_user.id]['buffer']['inventory_page'] - 1 >= 0:
                 saves[call.from_user.id]['buffer']['inventory_page'] -= 1
         send_inventory(call, bot)
     elif 'item' in call.data:
         item = call.data.split('_')[2]
-        info = cur.execute("""Select des, used from items where name = ?""", (item, )).fetchall()
-        des, used = info[0][0], info[0][1]
         bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
-                              text=f'Название: {item}\n\nОписание:{des}',
-                              reply_markup=get_inventory_item_keyboard(call, used))
+                              text=f'Название: {item}\n\nОписание:{ITEMS[item]["des"]}',
+                              reply_markup=get_inventory_item_keyboard(call, ITEMS[item]['used']))
 
 
 @bot.callback_query_handler(func=lambda call: 'move' in call.data.split('_')[0])
@@ -181,13 +205,20 @@ def move(call):
         send_inventory(call, bot)
 
 
+def start_dialogs(call, text, keyboard):
+    bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
+                          text=text, reply_markup=keyboard)
+    save_to_db(call.from_user.id)
+    return True
+
+
 def check_cell(call, x, y):
     this_map = saves[call.from_user.id]['pos']['map']
     new_map = saves[call.from_user.id]['pos']['map']
     cell = get_map_list(call.from_user.id)[y][x]
     if cell[0] in ENEMIES['skins']:
+        text = 'Начат бой против: '
         if cell[0] == '🕷':
-            text = 'Начат бой против: '
             saves[call.from_user.id]['buffer']['enemies'].append(
                 Spider(name='Обычный Паук', enhancement_n=0, x=x, y=y, bot=bot))
             for i in saves[call.from_user.id]['buffer']['enemies']:
@@ -200,61 +231,65 @@ def check_cell(call, x, y):
     else:
         if this_map == 'town_Bram':
             if cell == '🚪':
-                new_map = 'level1'
-                y = 1
-                x = 1
+                new_map, y, x = 'level1', 1, 1
             elif cell == '🧵':
-                new_map = 'town_Bram_sewing'
-                y = 1
-                x = 5
+                new_map, y, x = 'town_Bram_sewing', 1, 5
             elif cell == '📚':
-                new_map = 'town_Bram_library'
-                y = 9
-                x = 5
+                new_map, y, x = 'town_Bram_library', 9, 5
             elif cell == '⚔':
-                new_map = 'town_Bram_arena'
-                y = 1
-                x = 5
+                new_map, y, x = 'town_Bram_arena', 1, 5
+            elif cell == '🌕':
+                new_map, y, x = 'town_Bram_shop', 1, 5
+            elif cell == '💎':
+                new_map, y, x = 'town_Bram_auction', 1, 5
+            elif cell == '💰':
+                new_map, y, x = 'town_Bram_users_shop', 1, 5
         elif this_map == 'town_Bram_arena':
             if cell == '🚪':
-                new_map = 'town_Bram'
-                y = 4
-                x = 5
+                new_map, y, x = 'town_Bram', 4, 5
             elif cell == '🧔':
-                bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
-                                      text='Новая кровь, чего ждешь?', reply_markup=get_arena_man_keyboard())
-                save_to_db(call.from_user.id)
-                return True
+                return start_dialogs(call, 'Новая кровь, чего ждешь?', get_arena_man_keyboard())
         elif this_map == 'town_Bram_sewing':
             if cell == '🚪':
-                new_map = 'town_Bram'
-                y = 2
-                x = 4
+                new_map, y, x = 'town_Bram', 2, 4
             elif cell == '👰🏼':
-                bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
-                                      text='Да?', reply_markup=get_sewer_keyboard(call))
-                save_to_db(call.from_user.id)
-                return True
+                return start_dialogs(call, 'Да?', get_sewer_keyboard(call))
         elif this_map == 'town_Bram_library':
             if cell == '🚪':
-                new_map = 'town_Bram'
-                y = 2
-                x = 6
+                new_map, y, x = 'town_Bram', 2, 6
             elif cell == '👩🏼‍🏫':
-                bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
-                                      text='Хм?', reply_markup=get_librarian_keyboard())
-                save_to_db(call.from_user.id)
-                return True
+                return start_dialogs(call, 'Хм?', get_librarian_keyboard())
         elif this_map == 'level1':
             if cell == '🚪':
-                new_map = 'town_Bram'
-                y = 2
-                x = 5
+                new_map, y, x = 'town_Bram', 2, 5
+        elif this_map == 'town_Bram_shop':
+            if cell == '🚪' and y == 0:
+                new_map, y, x = 'town_Bram', 4, 3
+            elif cell == '🚪' and y != 0:
+                new_map, y, x = 'town_Bram_auction', 4, 1
+            elif cell == '🙋🏻':
+                return start_dialogs(call, 'Желаете что-то приобрести?', get_shop_man_keyboard())
+        elif this_map == 'town_Bram_auction':
+            if cell == '🚪' and y == 0:
+                new_map, y, x = 'town_Bram', 4, 2
+            elif cell == '🚪' and x == 0:
+                new_map, y, x = 'town_Bram_shop', 4, 9
+            elif cell == '🚪' and x == 10:
+                new_map, y, x = 'town_Bram_users_shop', 4, 1
+            elif cell == '🙋🏼':
+                pass
+        elif this_map == 'town_Bram_users_shop':
+            if cell == '🚪' and y == 0:
+                new_map, y, x = 'town_Bram', 4, 1
+            elif cell == '🚪' and y != 0:
+                new_map, y, x = 'town_Bram_auction', 4, 9
+            elif cell == '👱🏻‍':
+                pass
         saves[call.from_user.id]['pos']['y'] = y
         saves[call.from_user.id]['pos']['x'] = x
+        saves[call.from_user.id]['pos']['map'], new_map = new_map, saves[call.from_user.id]['pos']['map']
         if saves[call.from_user.id]['pos']['map'] != new_map:
             save_to_db(call.from_user.id)
-        saves[call.from_user.id]['pos']['map'] = new_map
     return False
 
 
@@ -265,10 +300,10 @@ def commands(message):
     elif message.text == '/help':
         bot.send_message(message.chat.id, 'Помощь? Я мало с чем могу помочь. Ты в башне, она разделена на множество этажей, в каждый этаж универсален. Вокруг башни мы построили город, в нем есть много всего. Возвращаться каждый в город не удобно, так что мы смогли некоторые этажи превратить в мини-города. Вроде как все! Ах да, после 5 этажа, башня каждый раз генерируется случайной, так что надейся на удачу.', reply_markup=choice_mode_keyboard)
     elif message.text == '/restart':
-        cur.execute(f"""Delete from auction where chat_id={message.chat.id}""")
-        cur.execute(f"""Delete from promocodes where chat_id={message.chat.id}""")
-        cur.execute(f"""Delete from users_shop where chat_id={message.chat.id}""")
-        cur.execute(f"""Delete from users where chat_id={message.chat.id}""")
+        cur.execute(f"""Delete from auction where chat_id={message.chat.id}; 
+            Delete from promocodes where chat_id={message.chat.id}; 
+            Delete from users_shop where chat_id={message.chat.id}; 
+            Delete from users where chat_id={message.chat.id}""")
         del saves[message.chat.id]
         load_mode(message, is_call=False)
 
@@ -286,6 +321,6 @@ thread_check_arena_fight_queue.start()
 print('thread_check_arena_fight_queue started')
 print('bot start')
 # try:
-bot.polling()
+bot.polling(none_stop=True)
 # except Exception as e:
 #     print(f'bot.polling {e}')

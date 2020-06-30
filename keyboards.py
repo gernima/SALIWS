@@ -10,22 +10,20 @@ choice_mode_keyboard.add(types.InlineKeyboardButton('Одиночная игра
 
 
 def send_hero_char(call, bot):
-    try:
-        bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
-                              text=f"Ник: {saves[call.from_user.id]['name']}\n"
-                                   f"Опыт: {saves[call.from_user.id]['xp']}/{saves[call.from_user.id]['need_xp']}\n"
-                                   f"Способности: ({', '.join(saves[call.from_user.id]['spells'])})\n"
-                                   f"Скин: {saves[call.from_user.id]['skin']}\n"
-                                   f"Квесты: ({', '.join(saves[call.from_user.id]['quests'])})\n"
-                                   f"Прокачка характеристик:",
-                              reply_markup=get_keyboard_characteristic(call))
-    except:
-        print('char too long', f"Ник: {saves[call.from_user.id]['name']}\n"
-                               f"Опыт: {saves[call.from_user.id]['xp']}/{saves[call.from_user.id]['need_xp']}\n"
-                               f"Способности: ({', '.join(saves[call.from_user.id]['spells'])})\n"
-                               f"Скин: {saves[call.from_user.id]['skin']}\n"
-                               f"Квесты: ({', '.join(saves[call.from_user.id]['quests'])})\n"
-                               f"Прокачка характеристик:")
+    # print(call.from_user.id, saves[call.from_user.id])
+    text = f"Ник: {saves[call.from_user.id]['name']}\n" \
+           f"Опыт: {saves[call.from_user.id]['xp']}/{saves[call.from_user.id]['need_xp']}\n" \
+           f"Золота: {saves[call.from_user.id]['gold']}\n" \
+           f"Способности: ({', '.join(saves[call.from_user.id]['spells'])})\n" \
+           f"Скин: {saves[call.from_user.id]['skin']}\n" \
+           f"Квесты: ({', '.join(saves[call.from_user.id]['quests'])})\n" \
+           f"Прокачка характеристик:"
+    # try:
+    bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
+                          text=text,
+                          reply_markup=get_keyboard_characteristic(call))
+    # except:
+    #     print('char too long', text)
 
 
 def get_map_list(chat_id):
@@ -51,17 +49,19 @@ def send_map(call, bot):
 
 
 def send_inventory(call, bot):
-    bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
-                          text='💼💼💼💼💼',
-                          reply_markup=get_inventory_keyboard(call))
+    try:
+        bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id,
+                              text=f'Вметимость инвентаря: {saves[call.from_user.id]["inventory_max_n"]}',
+                              reply_markup=get_inventory_keyboard(call))
+    except:
+        pass
 
 
 def get_keyboard_characteristic(call):
     keyboard = types.InlineKeyboardMarkup()
     # reset_button = types.InlineKeyboardButton(text="Сброс", callback_data="reset")
     keyboard.add(types.InlineKeyboardButton(
-        text="Очки характеристик {}".format(saves[call.from_user.id]['char']['free_char']),
-        callback_data='points'))
+        text="Очки характеристик {}".format(saves[call.from_user.id]['char']['free_char']), callback_data='points'))
     keyboard.add(types.InlineKeyboardButton(text="Сила ({}) | + 1".format(saves[call.from_user.id]['char']['strength']),
                                                          callback_data="char_strength"))
     keyboard.add(types.InlineKeyboardButton(text="Ловкость ({}) | + 1".format(saves[call.from_user.id]['char']['agility']),
@@ -101,6 +101,13 @@ def get_inventory_keyboard(call):
         keyboard.add(types.InlineKeyboardButton(f'{item} x {saves[call.from_user.id]["inventory"][item]}', callback_data=f'inventory_item_{item}'))
     keyboard.add(types.InlineKeyboardButton('След', callback_data=f'inventory_next_page'),
                  types.InlineKeyboardButton('Пред', callback_data=f'inventory_prev_page'))
+    return keyboard
+
+
+def get_yes_or_no_reg_name_keyboard(name):
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton('Да', callback_data=f'reg_name_yes_{name}'),
+                 types.InlineKeyboardButton('Нет', callback_data=f'reg_name_no_{name}'))
     return keyboard
 
 
@@ -167,10 +174,38 @@ def get_librarian_keyboard():
     return keyboard
 
 
+def get_shop_man_keyboard():
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton(text="Магазин", callback_data=f"shop_man_shop"))
+    keyboard.add(types.InlineKeyboardButton(text="Уйти", callback_data=f"sewer_talk_bye"))
+    return keyboard
+
+
+def get_shop_items_keyboard(call):
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton('Назад', callback_data=f'shop_man_shop_return'))
+    for item in list(SHOP.keys())[1:][saves[call.from_user.id]['buffer']['shop_page'] * saves[call.from_user.id]['buffer']['shop_page_slice']:
+                (1 + saves[call.from_user.id]['buffer']['shop_page']) * saves[call.from_user.id]['buffer']['shop_page_slice']]:
+        keyboard.add(types.InlineKeyboardButton(f'{item} x {SHOP[item]["n"]}',
+                                                callback_data=f'shop_man_shop_{item}'))
+    keyboard.add(types.InlineKeyboardButton('След', callback_data=f'shop_man_shop_next_page'),
+                 types.InlineKeyboardButton('Пред', callback_data=f'shop_man_shop_prev_page'))
+    return keyboard
+
+
+def get_shop_buy_sell_nothing_keyboard(item):
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton(f'Купить за {SHOP[item]["cost_buy"]}', callback_data=f'shop_man_shop_buy_{item}'))
+    keyboard.add(types.InlineKeyboardButton(f'Продать за {SHOP[item]["cost_sell"]}', callback_data=f'shop_man_shop_sell_{item}'))
+    keyboard.add(types.InlineKeyboardButton(f'Назад', callback_data=f'shop_man_shop_items_return'))
+    return keyboard
+
+
 def get_keyboard_drop_from_enemy(call):
     keyboard = types.InlineKeyboardMarkup()
     for item_i in range(len(saves[call.from_user.id]['buffer']["drop_items"])):
-        keyboard.add(types.InlineKeyboardButton(text=saves[call.from_user.id]['buffer']["drop_items"][item_i], callback_data=f"drop_from_enemy_{item_i}"))
+        keyboard.add(types.InlineKeyboardButton(text=saves[call.from_user.id]['buffer']["drop_items"][item_i],
+                                                callback_data=f"drop_from_enemy_{item_i}"))
     keyboard.add(types.InlineKeyboardButton('Готово!', callback_data='fight_ready'))
     return keyboard
 

@@ -2,7 +2,7 @@ from sqlite3 import connect
 from char import *
 from threading import Thread, Lock
 from random import sample
-from time import sleep
+from time import sleep, time
 
 
 lock = Lock()
@@ -94,9 +94,8 @@ def get_enemies_data_from_db():
     try:
         lock.acquire(True)
         enemies_in_db = [x[0] for x in cur.execute(f"""Select name from enemies""").fetchall()]
-        ENEMIES = get_data_db_not_users(db_table_name='enemies', template=ENEMIES['example'], res=ENEMIES, tables=['name', 'skin', 'des', 'xp', 'drop_gold', 'drop_gold_edit', 'lvl'], dict_tables=['char'])
+        ENEMIES = get_data_db_not_users(db_table_name='enemies', template=ENEMIES['example'], res=ENEMIES, tables=['skin', 'des', 'xp', 'drop_gold', 'drop_gold_edit', 'lvl'], dict_tables=['char'])
         for enemy_name in enemies_in_db:
-            ENEMIES[enemy_name] = ENEMIES['example'].copy()
             items = cur.execute(f"""Select drop_item from enemies where name = '{enemy_name}'""").fetchone()[0].split(';')
             for i in [x.split(':') for x in items]:
                 ENEMIES[enemy_name]['drop_items'][i[0]] = {}
@@ -107,35 +106,31 @@ def get_enemies_data_from_db():
         lock.release()
 
 
+def get_saves_data_to_db(chat_id):
+    inventory = ';'.join([f'{x}:{saves[chat_id]["inventory"][x]}' for x in saves[chat_id]['inventory'].keys()])
+    pos = ';'.join([f'{x}:{saves[chat_id]["pos"][x]}' for x in saves[chat_id]['pos'].keys()])
+    equip_items = ';'.join([f'{x}:{saves[chat_id]["equip_items"][x]}' for x in saves[chat_id]['equip_items'].keys()])
+    fight_db = ';'.join([f'{x}:{saves[chat_id]["fight"][x]}' for x in saves[chat_id]['fight'].keys()])
+    char = ';'.join([f'{x}:{saves[chat_id]["char"][x]}' for x in saves[chat_id]['char'].keys()])
+    quests = ';'.join([f'{x}:{saves[chat_id]["quests"][x]}' for x in saves[chat_id]['quests'].keys()])
+    quests_time = ';'.join([f'{x}:{saves[chat_id]["quests_time"][x]}' for x in saves[chat_id]['quests_time'].keys()])
+    return pos, inventory, quests, quests_time, equip_items, fight_db, char, chat_id
+
+
 def save_to_db(chat_id, name=''):
-    if chat_id in [int(x[0]) for x in cur.execute("""Select chat_id from users""").fetchall()]:
-        inventory = ';'.join([f'{x}:{saves[chat_id]["inventory"][x]}' for x in saves[chat_id]['inventory'].keys()])
-        pos = ';'.join([f'{x}:{saves[chat_id]["pos"][x]}' for x in saves[chat_id]['pos'].keys()])
-        equip_items = ';'.join(
-            [f'{x}:{saves[chat_id]["equip_items"][x]}' for x in saves[chat_id]['equip_items'].keys()])
-        fight_db = ';'.join([f'{x}:{saves[chat_id]["fight"][x]}' for x in saves[chat_id]['fight'].keys()])
-        char = ';'.join([f'{x}:{saves[chat_id]["char"][x]}' for x in saves[chat_id]['char'].keys()])
-        quests = ';'.join([f'{x}:{saves[chat_id]["quests"][x]}' for x in saves[chat_id]['quests'].keys()])
-        quests_time = ';'.join([f'{x}:{saves[chat_id]["quests_time"][x]}' for x in saves[chat_id]['quests_time'].keys()])
-        cur.execute(f"""UPDATE users SET gold = ?,
-                lvl = ?, pos = ?, inventory = ?, skin = ?, xp = ?, need_xp = ?, spells = ?, 
-                quests = ?, quests_time=?, inventory_max_n = ?, equip_items = ?, fight = ?, char = ? WHERE chat_id = ?""",
-                    (saves[chat_id]['gold'], saves[chat_id]['lvl'], pos,
-                    inventory, saves[chat_id]['skin'],
-                saves[chat_id]['xp'], saves[chat_id]['need_xp'], ';'.join(saves[chat_id]['spells']),
-                quests, quests_time, saves[chat_id]['inventory_max_n'], equip_items, fight_db, char, chat_id))
-    else:
+    if chat_id not in saves:
         saves[chat_id] = USER_EXAMPLE.copy()
         update_char(chat_id)
         saves[chat_id]['name'] = name
-        inventory = ';'.join([f'{x}:{saves[chat_id]["inventory"][x]}' for x in saves[chat_id]['inventory'].keys()])
-        pos = ';'.join([f'{x}:{saves[chat_id]["pos"][x]}' for x in saves[chat_id]['pos'].keys()])
-        equip_items = ';'.join(
-            [f'{x}:{saves[chat_id]["equip_items"][x]}' for x in saves[chat_id]['equip_items'].keys()])
-        fight_db = ';'.join([f'{x}:{saves[chat_id]["fight"][x]}' for x in saves[chat_id]['fight'].keys()])
-        char = ';'.join([f'{x}:{saves[chat_id]["char"][x]}' for x in saves[chat_id]['char'].keys()])
-        quests = ';'.join([f'{x}:{saves[chat_id]["quests"][x]}' for x in saves[chat_id]['quests'].keys()])
-        quests_time = ';'.join([f'{x}:{saves[chat_id]["quests_time"][x]}' for x in saves[chat_id]['quests_time'].keys()])
+    pos, inventory, quests, quests_time, equip_items, fight_db, char, chat_id = get_saves_data_to_db(chat_id)
+    if chat_id in [int(x[0]) for x in cur.execute("""Select chat_id from users""").fetchall()]:
+        cur.execute(f"""UPDATE users SET gold = ?,
+                lvl = ?, pos = ?, inventory = ?, skin = ?, xp = ?, need_xp = ?, spells = ?, 
+                quests = ?, quests_time=?, inventory_max_n = ?, equip_items = ?, fight = ?, char = ? WHERE chat_id = ?""",
+                    (saves[chat_id]['gold'], saves[chat_id]['lvl'], pos, inventory, saves[chat_id]['skin'],
+                saves[chat_id]['xp'], saves[chat_id]['need_xp'], ';'.join(saves[chat_id]['spells']),
+                quests, quests_time, saves[chat_id]['inventory_max_n'], equip_items, fight_db, char, chat_id))
+    else:
         q = f"""Insert into users Values({('?,'*16)[:-1]})"""
         cur.execute(q, (chat_id, saves[chat_id]['name'], saves[chat_id]['gold'], saves[chat_id]['lvl'], pos, inventory,
                         saves[chat_id]['skin'], saves[chat_id]['xp'], saves[chat_id]['need_xp'],
@@ -150,6 +145,7 @@ def get_data_from_db(chat_id, name=''):
     if chat_id not in [int(x[0]) for x in cur.execute("""Select chat_id from users""").fetchall()]:
         save_to_db(chat_id, name)
     else:
+        saves[chat_id] = USER_EXAMPLE.copy()
         tables = ['name', 'gold', 'lvl', 'skin', 'xp', 'need_xp', 'inventory_max_n']
         dict_tables = ['pos', 'equip_items', 'fight', 'char']
         list_tables = ['spells']
@@ -198,9 +194,9 @@ def get_data_db_not_users(db_table_name, res={}, tables=[], dict_tables=[], list
     count_in_db = [x[0] for x in cur.execute(f"""Select {db_table_for_count} from {db_table_name}""").fetchall()]
     for name in count_in_db:
         if template:
-            res[name] = template
+            res[name] = template.copy()
         for table in tables:
-            res[name][table] = cur.execute(f"""Select {table} from {db_table_name} where name = '{name}'""").fetchone()[0]
+            res[name][table] = cur.execute(f"""Select {table} from {db_table_name} where {db_table_for_count} = '{name}'""").fetchone()[0]
         for dict_table in dict_tables:
             res[name][dict_table] = from_db_dict_to_normal_dict(dict_table, name, db_table_name)
         for table in list_tables:
@@ -213,32 +209,80 @@ def get_data_db_not_users(db_table_name, res={}, tables=[], dict_tables=[], list
 
 
 def get_quests_from_db():
-    return get_data_db_not_users(db_table_name='quests', res={}, tables=['name', 'des', 'time', 'map', 'need_lvl',
+    global QUESTS
+    QUESTS = get_data_db_not_users(db_table_name='quests', res={}, tables=['name', 'des', 'time', 'map', 'need_lvl',
                   'rewards_xp', 'who_accept', 'text_complete'], dict_tables=['add_items', 'rewards_items', 'need_items'], template=QUESTS_DB_TEMPLATE)
 
 
 def get_spells_from_db():
-    return get_data_db_not_users(db_table_name='spells', res={}, tables=['name', 'des'], template=SPELLS_DB_TEMPLATE)
+    global SPELLS
+    SPELLS = get_data_db_not_users(db_table_name='spells', res={}, tables=['name', 'des'], template=SPELLS_DB_TEMPLATE)
 
 
 def get_users_shop_from_db():
-    return get_data_db_not_users(db_table_name='spells', res={}, tables=['name', 'des'], template=USERS_SHOP)
+    global USERS_SHOP
+    USERS_SHOP = get_data_db_not_users(db_table_name='users_shop', res=USERS_SHOP, tables=['chat_id', 'cost', 'n'], template=USERS_SHOP['item'], db_table_for_count='item')
 
 
 def get_shop_from_db():
-    pass
+    global SHOP
+    SHOP = get_data_db_not_users(db_table_name='shop', template=SHOP['item'], res=SHOP,
+                                 tables=['cost_sell', 'cost_buy', 'n'], db_table_for_count='item')
+
+
+def check_auction_winners(res, db=False):
+    for item in list(res.keys())[1:]:
+        if res[item]['time_start'] + res[item]['time_continue'] <= time():
+            winner = res[item]['who_up_last']
+            if winner in saves:
+                saves[winner]['inventory'][item] = res[item]['n']
+                saves[winner]['gold'] += res[item]['cost']
+            else:
+                try:
+                    lock.acquire(True)
+                    inv = {}
+                    b = cur.execute(f"""Select inventory from users where chat_id = {winner}""").fetchone()[0]
+                    if b and len(b.split(';')) > 0 and b.split(';')[0].strip() != '':
+                        for i in [x.split(':') for x in b.split(';')]:
+                            inv[i[0]] = int(i[1])
+                    inv[item] = res[item]['n']
+                    inventory = ';'.join([f'{x}:{inv[x]}' for x in inv.keys()])
+                    gold = cur.execute(f"""Select gold from users where chat_id = {winner}""").fetchone()[0] + res[item]['cost']
+                    cur.execute(f"""UPDATE users SET inventory='{inventory}', gold={gold} WHERE chat_id = {winner}""")
+                finally:
+                    lock.release()
+            if db:
+                try:
+                    lock.acquire(True)
+                    cur.execute(f"""Delete from auction where item='{item}'""")
+                finally:
+                    lock.release()
+            del res[item]
+    return res
 
 
 def get_auction_from_db():
-    pass
+    global AUCTION
+    res = get_data_db_not_users(db_table_name='auction', template=AUCTION['item'], res=AUCTION,
+                                tables=['cost', 'n', 'time_continue', 'time_start', 'who_up_last', 'item'], db_table_for_count='item')
+    AUCTION = check_auction_winners(res, True)
+
+
+def get_items_from_db():
+    global ITEMS
+    ITEMS = get_data_db_not_users(db_table_name='items', template=ITEMS_TEMPLATE, res=ITEMS,
+                                  tables=['des', 'used'], db_table_for_count='name')
 
 
 def update_data_from_db_constant():
-    global QUESTS, SPELLS
     while True:
-        QUESTS = get_quests_from_db()
-        SPELLS = get_spells_from_db()
-        print('update_data_from_db_constant')
+        get_quests_from_db()
+        get_spells_from_db()
+        get_shop_from_db()
+        get_items_from_db()
+        print('Quests, Spells, Shop, Items updated')
+        check_auction_winners(AUCTION)
+        print('check auctions winners finished')
         sleep(3600)
 
 
@@ -250,9 +294,10 @@ SKINS_SHOP = {'town_Bram': {'🤡': 100, '😒': 100, '😡': 100, '🤓': 100, 
 SPELLS_SHOP = {'town_Bram': {'Усиленный удар': 100}}
 USER_EXAMPLE = {'name': '', 'gold': 0, 'lvl': 1, 'pos': {'map': 'town_Bram', 'x': 5, 'y': 4}, 'inventory': {}, 'skin': '😀',
                 'need_xp': 0, 'xp': 0, 'spells': [], 'quests': {}, 'quests_time': {}, 'inventory_max_n': 3,
-                'buffer': {'enemies': [], 'drop_items': [], 'inventory_page': 0, 'inventory_slice': 20,
-                'fight_text': {'text': '', 'keyboard': ''}, 'quest_keyboard_accept': None, 'quest_keyboard_decline': None},
-                'equip_items': {'head': '', 'body': '', 'pants': '', 'boots': ''},
+                'buffer': {'enemies': [], 'drop_items': [], 'inventory_page': 0, 'inventory_slice': 10,
+                'fight_text': {'text': '', 'keyboard': ''}, 'quest_keyboard_accept': None, 'quest_keyboard_decline': None,
+                           'shop_page': 0, 'shop_page_slice': 20},
+                'equip_items': {'head': '', 'body': '', 'pants': '', 'boots': '', 'backpack': ''},
                 'fight': {'damage': 0, 'block': 0, 'dodge': 0, 'chance_of_loot': 0, 'hp_regen': 0, 'mp_regen': 0,
                 'crit': 0, 'block_add': 0, 'hp': 0, 'mp': 0, 'max_hp': 0, 'max_mp': 0},
                 'char': {'strength': 1, 'agility': 1, 'lucky': 1, 'intelligence': 1, 'wisdom': 1, 'stamina': 1, 'free_char': 5}}
@@ -266,10 +311,20 @@ QUESTS_DB_TEMPLATE = {'name': '', 'des': '', 'time': 0, 'map': '', 'need_lvl': 0
                       'rewards_xp': 0, 'who_accept': '', 'text_complete': ''}
 SPELLS_DB_TEMPLATE = {'des': ''}
 QUESTS = {}
+get_quests_from_db()
+get_spells_from_db()
 SPELLS = {}
-USERS_SHOP = {'chat_id': {'item': '', 'cost': 0}}
-SHOP = {'item': {'cost': 0}}
-AUCTION = {'chat_id': {'item': '', 'cost': 0, 'who_up_last': 0, 'time': 0}}
+USERS_SHOP = {'item': {'chat_id': 0, 'cost': 0, 'n': 0}}
+SHOP = {'item': {'cost': 0, 'n': 0, 'max_n': 0}}
+AUCTION = {'item': {'chat_id': 0, 'cost': 0, 'who_up_last': 0, 'time': 0, 'n': 0}}
+get_users_shop_from_db()
+get_shop_from_db()
+get_auction_from_db()
+print('users_shop, auction, shop loaded')
+ITEMS_TEMPLATE = {'des': '', 'used': 0}
+ITEMS = {}
+get_items_from_db()
+# print(f'USERS_SHOP {USERS_SHOP}\n\nSHOP {SHOP}\n\nAUCTION {AUCTION}')
 arena_queue = []
 try:
     lock.acquire(True)
@@ -278,6 +333,7 @@ finally:
     lock.release()
 if chat_ids:
     for i in chat_ids:
+        saves[i] = USER_EXAMPLE.copy()
         get_data_from_db(i)
 print('all users is connected')
 print('base_var_and_func started')
