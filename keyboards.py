@@ -151,18 +151,18 @@ def get_arena_reg_keyboard(call):
     return keyboard
 
 
-def get_arena_fight_keyboard(opponent_chat_id, your_step=True):
+def get_arena_fight_keyboard(your_step=True):
     keyboard = types.InlineKeyboardMarkup()
-    keyboard.add(types.InlineKeyboardButton("Сдаться", callback_data=f'arena_fight_leave_{opponent_chat_id}'))
+    keyboard.add(types.InlineKeyboardButton("Сдаться", callback_data=f'arena_fight_leave'))
     if your_step:
-        keyboard.add(types.InlineKeyboardButton("Ваш ход"))
-        keyboard.add(types.InlineKeyboardButton('Атака', callback_data=f'arena_fight_attack_{opponent_chat_id}'),
-                     types.InlineKeyboardButton('Уклонение', callback_data=f'arena_fight_dodge_{opponent_chat_id}'),
-                     types.InlineKeyboardButton('Блок', callback_data=f'arena_fight_block_{opponent_chat_id}'))
-        keyboard.add(types.InlineKeyboardButton("Способности", callback_data=f'arena_fight_spells_{opponent_chat_id}'),
-                     types.InlineKeyboardButton('Инвентарь', callback_data=f'arena_fight_inv_{opponent_chat_id}'))
+        keyboard.add(types.InlineKeyboardButton("Ваш ход", callback_data=f'arena_fight_your_step'))
+        keyboard.add(types.InlineKeyboardButton('Атака', callback_data=f'arena_fight_attack'),
+                     types.InlineKeyboardButton('Уклонение', callback_data=f'arena_fight_dodge'),
+                     types.InlineKeyboardButton('Блок', callback_data=f'arena_fight_block'))
+        keyboard.add(types.InlineKeyboardButton("Способности", callback_data=f'arena_fight_spells'),
+                     types.InlineKeyboardButton('Инвентарь', callback_data=f'arena_fight_inv'))
     else:
-        keyboard.add(types.InlineKeyboardButton("Ход противника"))
+        keyboard.add(types.InlineKeyboardButton("Ход противника", callback_data=f'arena_fight_opponent_step'))
     return keyboard
 
 
@@ -201,10 +201,10 @@ def get_shop_buy_sell_nothing_keyboard(item):
     return keyboard
 
 
-def get_keyboard_drop_from_enemy(call):
+def get_keyboard_drop_from_enemy(chat_id):
     keyboard = types.InlineKeyboardMarkup()
-    for item_i in range(len(saves[call.from_user.id]['buffer']["drop_items"])):
-        keyboard.add(types.InlineKeyboardButton(text=saves[call.from_user.id]['buffer']["drop_items"][item_i],
+    for item_i in range(len(saves[chat_id]['buffer']["drop_items"])):
+        keyboard.add(types.InlineKeyboardButton(text=saves[chat_id]['buffer']["drop_items"][item_i],
                                                 callback_data=f"drop_from_enemy_{item_i}"))
     keyboard.add(types.InlineKeyboardButton('Готово!', callback_data='fight_ready'))
     return keyboard

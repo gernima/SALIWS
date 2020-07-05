@@ -3,6 +3,7 @@ from keyboards import *
 from pickle import load
 from base_var_and_func import *
 from time import time
+from fight import check_arena_queue
 
 
 def yes_or_no_skins(call, bot):
@@ -196,15 +197,16 @@ def arena(call, bot):
     rules = "В мои обязанности входит рассказать правила перед этим, так что буду краток. Твоя задача зарегестрироваться и ждать момента, когда тебе подберется соперник. Вы будете сражаться, нанося друг другу удары по очереди. Каждому на ход дается максимум 1 минута, не вложился в рамки? Тогда пропускаешь ход и он переходит противнику. Ах да! Насчет смерти, если умрешь на арене то умрешь по настоящему, так что береги жизнь. Мне нужны хорошие бойцы."
     if "reg" in call.data:
         if 'yes' in call.data:
-            arena_queue.append(chat_id)
-            edit_message(bot, call, 'Ищем соперника, жди...', get_arena_reg_keyboard(call))
+            if check_arena_queue(call, bot):
+                arena_queue[chat_id] = call
+                edit_message(bot, call, 'Ищем соперника, жди...', get_arena_reg_keyboard(call))
         elif 'leave' in call.data:
             if chat_id in arena_queue:
-                arena_queue.remove(chat_id)
+                del arena_queue[chat_id]
             edit_message(bot, call, 'Ну?', get_arena_man_keyboard())
         elif 'no' in call.data:
             if chat_id in arena_queue:
-                arena_queue.remove(chat_id)
+                del arena_queue[chat_id]
             edit_message(bot, call, rules, get_arena_reg_keyboard(call))
         else:
             edit_message(bot, call, rules, get_arena_reg_keyboard(call))

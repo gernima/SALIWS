@@ -18,22 +18,7 @@ token = environ['dev_token']
 bot = telebot.TeleBot(token)
 
 
-def check_arena_queue():
-    while True:
-        if len(arena_queue) >= 2:
-            opponents = sample(arena_queue, 2)
-            arena_queue.remove(opponents[0])
-            arena_queue.remove(opponents[1])
-            if randint(0, 1) == 0:
-                who_first = opponents[0]
-            else:
-                who_first = opponents[1]
-            edit_message(bot, opponents[0], f'Начат бой против {saves[opponents[0]]["name"]}', get_arena_fight_keyboard(opponents[0], who_first))
-            edit_message(bot, opponents[1], f'Начат бой против {saves[opponents[1]]["name"]}', get_arena_fight_keyboard(opponents[1], who_first))
-            print(f'arena_fight {opponents[0]} {saves[opponents[0]]["name"]} vs {opponents[1]} {saves[opponents[1]]["name"]}')
-
-
-@bot.callback_query_handler(func=lambda call: 'fight' in call.data.split('_')[0])
+@bot.callback_query_handler(func=lambda call: 'fight' in call.data)
 def fight(call):
     fight_checker(call, bot)
 
@@ -300,12 +285,16 @@ def commands(message):
     elif message.text == '/help':
         bot.send_message(message.chat.id, 'Помощь? Я мало с чем могу помочь. Ты в башне, она разделена на множество этажей, в каждый этаж универсален. Вокруг башни мы построили город, в нем есть много всего. Возвращаться каждый в город не удобно, так что мы смогли некоторые этажи превратить в мини-города. Вроде как все! Ах да, после 5 этажа, башня каждый раз генерируется случайной, так что надейся на удачу.', reply_markup=choice_mode_keyboard)
     elif message.text == '/restart':
-        cur.execute(f"""Delete from auction where chat_id={message.chat.id}; 
-            Delete from promocodes where chat_id={message.chat.id}; 
-            Delete from users_shop where chat_id={message.chat.id}; 
-            Delete from users where chat_id={message.chat.id}""")
-        del saves[message.chat.id]
-        load_mode(message, is_call=False)
+        try:
+            lock.acquire(True)
+            cur.execute(f"""Delete from auction where chat_id={message.chat.id}; 
+                Delete from promocodes where chat_id={message.chat.id}; 
+                Delete from users_shop where chat_id={message.chat.id}; 
+                Delete from users where chat_id={message.chat.id}""")
+            del saves[message.chat.id]
+            load_mode(message, is_call=False)
+        except:
+            lock.release()
 
 
 # thread_arena_queue = Thread(target=check_arena_queue(), args=(bot))
@@ -316,9 +305,6 @@ print('thread_check_quest started')
 thread_update_data_from_db = Thread(target=update_data_from_db_constant)
 thread_update_data_from_db.start()
 print('thread_update_data started')
-thread_check_arena_fight_queue = Thread(target=check_arena_queue)
-thread_check_arena_fight_queue.start()
-print('thread_check_arena_fight_queue started')
 print('bot start')
 # try:
 bot.polling(none_stop=True)

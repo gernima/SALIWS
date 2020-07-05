@@ -3,6 +3,7 @@ from char import *
 from threading import Thread, Lock
 from random import sample
 from time import sleep, time
+from copy import deepcopy
 
 
 lock = Lock()
@@ -119,7 +120,7 @@ def get_saves_data_to_db(chat_id):
 
 def save_to_db(chat_id, name=''):
     if chat_id not in saves:
-        saves[chat_id] = USER_EXAMPLE.copy()
+        saves[chat_id] = deepcopy(get_user_example())
         update_char(chat_id)
         saves[chat_id]['name'] = name
     pos, inventory, quests, quests_time, equip_items, fight_db, char, chat_id = get_saves_data_to_db(chat_id)
@@ -142,10 +143,12 @@ def save_to_db(chat_id, name=''):
 def get_data_from_db(chat_id, name=''):
     # try:
     #     lock.acquire(True)
+
     if chat_id not in [int(x[0]) for x in cur.execute("""Select chat_id from users""").fetchall()]:
         save_to_db(chat_id, name)
     else:
-        saves[chat_id] = USER_EXAMPLE.copy()
+        saves[chat_id] = deepcopy(get_user_example())
+        # print(saves[chat_id])
         tables = ['name', 'gold', 'lvl', 'skin', 'xp', 'need_xp', 'inventory_max_n']
         dict_tables = ['pos', 'equip_items', 'fight', 'char']
         list_tables = ['spells']
@@ -183,10 +186,9 @@ def get_data_from_db(chat_id, name=''):
                         saves[chat_id][table][i[0]] = float(i[1])
                     else:
                         saves[chat_id][table][i[0]] = i[1]
-        con.commit()
 
 
-def edit_message(bot, call, text, keyboard=True):
+def edit_message(bot, call, text, keyboard):
     bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id, text=text, reply_markup=keyboard)
 
 
@@ -286,21 +288,29 @@ def update_data_from_db_constant():
         sleep(3600)
 
 
+def get_user_example():
+    USER_EXAMPLE = {'name': '', 'gold': 0, 'lvl': 1, 'pos': {'map': 'town_Bram', 'x': 5, 'y': 4}, 'inventory': {},
+                    'skin': '😀',
+                    'need_xp': 0, 'xp': 0, 'spells': [], 'quests': {}, 'quests_time': {}, 'inventory_max_n': 3,
+                    'buffer': {'enemies': [], 'drop_items': [], 'inventory_page': 0, 'inventory_slice': 10,
+                               'fight_text': {'text': '', 'keyboard': ''}, 'quest_keyboard_accept': None,
+                               'quest_keyboard_decline': None,
+                               'shop_page': 0, 'shop_page_slice': 20, 'arena_opponent_call': None},
+                    'equip_items': {'head': '', 'body': '', 'pants': '', 'boots': '', 'backpack': ''},
+                    'fight': {'damage': 0, 'block': 0, 'dodge': 0, 'chance_of_loot': 0, 'hp_regen': 0, 'mp_regen': 0,
+                              'crit': 0, 'block_add': 0, 'hp': 0, 'mp': 0, 'max_hp': 0, 'max_mp': 0},
+                    'char': {'strength': 1, 'agility': 1, 'lucky': 1, 'intelligence': 1, 'wisdom': 1, 'stamina': 1,
+                             'free_char': 5}}
+    # print(USER_EXAMPLE)
+    return USER_EXAMPLE
+
+
 con = connect("saves.db", check_same_thread=False, timeout=10)
 cur = con.cursor()
 CHARACTERISTICS = {'strength', 'agility', 'intelligence', 'lucky', 'wisdom', 'stamina'}
 SKINS_SHOP = {'town_Bram': {'🤡': 100, '😒': 100, '😡': 100, '🤓': 100, '😀': 100, '😈': 100,
                             '💩': 100, '👻': 100, '👺': 100, '👹': 100, '👿': 100, '💀': 100}}
 SPELLS_SHOP = {'town_Bram': {'Усиленный удар': 100}}
-USER_EXAMPLE = {'name': '', 'gold': 0, 'lvl': 1, 'pos': {'map': 'town_Bram', 'x': 5, 'y': 4}, 'inventory': {}, 'skin': '😀',
-                'need_xp': 0, 'xp': 0, 'spells': [], 'quests': {}, 'quests_time': {}, 'inventory_max_n': 3,
-                'buffer': {'enemies': [], 'drop_items': [], 'inventory_page': 0, 'inventory_slice': 10,
-                'fight_text': {'text': '', 'keyboard': ''}, 'quest_keyboard_accept': None, 'quest_keyboard_decline': None,
-                           'shop_page': 0, 'shop_page_slice': 20},
-                'equip_items': {'head': '', 'body': '', 'pants': '', 'boots': '', 'backpack': ''},
-                'fight': {'damage': 0, 'block': 0, 'dodge': 0, 'chance_of_loot': 0, 'hp_regen': 0, 'mp_regen': 0,
-                'crit': 0, 'block_add': 0, 'hp': 0, 'mp': 0, 'max_hp': 0, 'max_mp': 0},
-                'char': {'strength': 1, 'agility': 1, 'lucky': 1, 'intelligence': 1, 'wisdom': 1, 'stamina': 1, 'free_char': 5}}
 saves = {}
 ENEMIES_ITEM_TEMPLATE = {'example': {'n': 0, 'chance': 0}}
 ENEMIES = {'skins': [], 'example': {'char': {}, 'des': '', 'spells': {}, 'xp': 0, 'lvl': 0, 'skin': '', 'drop_items': {}, 'drop_gold': 0, 'drop_gold_edit': 0}}
@@ -325,7 +335,7 @@ ITEMS_TEMPLATE = {'des': '', 'used': 0}
 ITEMS = {}
 get_items_from_db()
 # print(f'USERS_SHOP {USERS_SHOP}\n\nSHOP {SHOP}\n\nAUCTION {AUCTION}')
-arena_queue = []
+arena_queue = {}
 try:
     lock.acquire(True)
     chat_ids = [int(x[0]) for x in cur.execute("""Select chat_id from users""").fetchall()]
@@ -333,7 +343,6 @@ finally:
     lock.release()
 if chat_ids:
     for i in chat_ids:
-        saves[i] = USER_EXAMPLE.copy()
         get_data_from_db(i)
 print('all users is connected')
 print('base_var_and_func started')
